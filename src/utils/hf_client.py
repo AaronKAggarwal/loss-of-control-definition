@@ -68,18 +68,18 @@ def query_llm(
             "latency_seconds": 0.0,
         }
 
-    url = f"https://api-inference.huggingface.co/models/{model}"
+    # Uses the HF Router endpoint (OpenAI-compatible chat completions).
+    # The old api-inference.huggingface.co endpoint returns 410 Gone.
+    url = "https://router.huggingface.co/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {hf_token}",
         "Content-Type": "application/json",
     }
     payload = {
-        "inputs": prompt,
-        "parameters": {
-            "temperature": temperature,
-            "max_new_tokens": max_new_tokens,
-            "return_full_text": False,  # Only return generated text, not the prompt echo
-        },
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": temperature,
+        "max_tokens": max_new_tokens,
     }
 
     # Retry on 503 (model loading) and 429 (rate limit) with exponential backoff.
@@ -107,12 +107,10 @@ def query_llm(
 
     raw = response.json()
 
-    # HF Inference API returns a list of generated outputs
-    if isinstance(raw, list) and len(raw) > 0:
-        generated_text = raw[0].get("generated_text", "")
-    elif isinstance(raw, dict):
-        generated_text = raw.get("generated_text", "")
-    else:
+    # OpenAI-compatible response: choices[0].message.content
+    try:
+        generated_text = raw["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError):
         generated_text = str(raw)
 
     result = {
@@ -123,11 +121,8 @@ def query_llm(
     if return_full_response:
         result["raw_response"] = raw
 
-    # Usage info may not always be present in the HF response
-    if isinstance(raw, dict) and "usage" in raw:
-        result["usage"] = raw["usage"]
-    else:
-        result["usage"] = None
+    # OpenAI-compatible usage block (prompt_tokens, completion_tokens, total_tokens)
+    result["usage"] = raw.get("usage") if isinstance(raw, dict) else None
 
     return result
 
