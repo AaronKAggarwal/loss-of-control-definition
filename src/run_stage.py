@@ -6,6 +6,7 @@ import re
 import time
 from datetime import datetime, timezone
 
+import requests
 import yaml
 
 from src.utils.hf_client import query_llm
@@ -129,15 +130,26 @@ def run_1a(
         # Fill prompt
         filled_prompt = fill_prompt_1a(template, seed_terms, paper_text)
 
-        # Call LLM
+        # Call LLM — catch HTTP errors per-paper so one failure doesn't kill the run
         paper_start = time.time()
-        result = query_llm(
-            prompt=filled_prompt,
-            model=config["model"],
-            hf_token=hf_token,
-            temperature=config.get("temperature", 0.1),
-            dry_run=dry_run,
-        )
+        try:
+            result = query_llm(
+                prompt=filled_prompt,
+                model=config["model"],
+                hf_token=hf_token,
+                temperature=config.get("temperature", 0.1),
+                dry_run=dry_run,
+            )
+        except requests.HTTPError as e:
+            paper_latency = round(time.time() - paper_start, 2)
+            msg = f"API error: {e}"
+            print(f"  [{i}/{total}] ERROR {paper_id} — {msg}")
+            errors.append({"paper_id": paper_id, "error": msg})
+            per_paper_meta.append({
+                "paper_id": paper_id, "skipped": False,
+                "error": msg, "latency_seconds": paper_latency,
+            })
+            continue
         paper_latency = round(time.time() - paper_start, 2)
 
         generated_text = result["generated_text"]

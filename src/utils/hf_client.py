@@ -102,7 +102,8 @@ def query_llm(
             time.sleep(wait)
             continue
 
-        # Non-recoverable or final attempt — raise
+        # Non-recoverable or final attempt — print body for debugging, then raise
+        print(f"  [ERROR] {response.status_code}: {response.text[:300]}")
         response.raise_for_status()
 
     raw = response.json()
