@@ -1,0 +1,8 @@
+# Paper registry: single source of truth for the corpus.
+# Populate with all 22 papers before running the pipeline.
+# The pipeline iterates over this list, not over whatever PDFs exist in a folder.
+papers:
+  # - id: carlsmith_2023
+  #   filename: "Carlsmith_2023_Is_Power_Seeking_AI_An_Existential_Risk.pdf"
+  #   citation: "Carlsmith, J. (2023). Is Power-Seeking AI an Existential Risk?"
+  #   notes: ""

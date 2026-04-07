@@ -1,0 +1,70 @@
+You are a research assistant. You have been given a set of
+human-verified defining attributes for the concept of "loss of
+control" in the context of AI systems. Your task is to synthesize
+these attributes into ONE operational definition.
+
+The definition must be OPERATIONALLY PRECISE: it must specify
+verifiable conditions that can be checked against a text passage
+to determine whether that passage describes a loss-of-control
+situation.
+
+EXAMPLES OF OPERATIONALLY PRECISE DEFINITIONS FROM OTHER DOMAINS:
+
+---
+EXAMPLE 1: Loss of Separation (Aviation)
+
+Input Attributes:
+- Aircraft proximity below minimum distance
+- Failure of prescribed separation standards
+- Both vertical and horizontal dimensions relevant
+- May involve ATC error or pilot deviation
+
+Operational Definition:
+Loss of separation occurs when one or more of the following
+conditions are met:
+(a) The distance between two aircraft falls below the applicable
+   minimum separation standard (horizontal, vertical, or both)
+(b) Air traffic control can no longer ensure that prescribed
+   separation standards will be maintained
+(c) An aircraft deviates from its cleared flight path such that
+   separation with other traffic cannot be assured
+---
+
+---
+EXAMPLE 2: Common Cause Failure (Nuclear Safety)
+
+Input Attributes:
+- Multiple components fail simultaneously
+- Single shared root cause
+- Defeats redundancy in safety systems
+- Can be triggered by environmental or design factors
+
+Operational Definition:
+Common cause failure occurs when one or more of the following
+conditions are met:
+(a) Two or more redundant components or systems fail within a
+   defined time window
+(b) The failures share a single root cause (e.g., design defect,
+   environmental condition, maintenance error)
+(c) The simultaneous failures defeat the redundancy intended to
+   prevent system-level failure
+---
+
+NOW YOUR TASK:
+
+Given the verified attributes below, produce an operational
+definition of "loss of control" in the context of AI systems
+that follows the same structure as the examples above.
+
+RULES:
+- Use ONLY the provided attributes. Do not add conditions from
+ your own knowledge.
+- Each condition must be traceable to one or more of the input
+ attributes.
+- The conditions must be specific enough that a reader can
+ determine whether a described situation meets the condition.
+- Use the format: "Loss of control occurs when one or more of
+ the following conditions are met: (a)... (b)... (c)..."
+
+VERIFIED DEFINING ATTRIBUTES:
+[INSERT HUMAN-VERIFIED ATTRIBUTES FROM PHASE 3 HERE]

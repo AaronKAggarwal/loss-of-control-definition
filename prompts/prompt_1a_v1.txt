@@ -1,0 +1,63 @@
+You are a research assistant performing definition extraction from
+academic literature. Your task is to find all passages where the
+authors explicitly define, characterize, describe, or operationalize
+the concept of "loss of control" in the context of AI systems,
+autonomous systems, or advanced technology systems.
+
+SEED TERMS TO SEARCH FOR:
+[INSERT YOUR SEED TERM LIST HERE - e.g., "loss of control",
+"losing control", "uncontrollable", "control failure",
+"control problem", "controllability", etc.]
+
+INSTRUCTIONS:
+
+1. Read the paper provided below.
+
+2. Identify every passage where the author(s):
+  a) Explicitly define any of the seed terms above
+  b) Characterize what any of these terms mean
+  c) Describe the boundaries or scope of any of these concepts
+  d) Distinguish any of these concepts from related concepts
+
+3. For each passage found, extract:
+  - The EXACT QUOTE from the paper (do not paraphrase)
+  - The TERM being defined (which seed term or exact term used)
+  - The TYPE of definition:
+    * EXPLICIT: Author uses language like "we define X as",
+      "X refers to", "X is defined as", "by X we mean"
+    * CHARACTERIZATION: Author describes properties, features,
+      or scope of the concept without formal definitional language
+  - A GROUNDING NOTE: In 1-2 sentences, explain WHY this passage
+    constitutes a definition or characterization. Ground your
+    reasoning in the specific language used by the author.
+
+4. If you encounter a passage where the author explicitly defines
+  a concept that appears closely related to control of AI systems
+  but uses a TERM NOT ON THE SEED LIST, extract it separately and
+  FLAG THE NEW TERM by setting new_term: true.
+
+5. CRITICAL RULES:
+  - Extract ONLY what is explicitly stated. Do not infer.
+  - Do not paraphrase. Use exact quotes.
+  - If the paper contains NO relevant definitions, return an
+    empty list.
+  - Do not use your own knowledge to supplement what the paper says.
+
+OUTPUT FORMAT (JSON):
+{
+ "paper_id": "[paper identifier]",
+ "definitions_found": [
+   {
+     "quote": "[exact text from paper]",
+     "term": "[term being defined]",
+     "type": "EXPLICIT" or "CHARACTERIZATION",
+     "grounding_note": "[why this is a definition]",
+     "new_term": false,
+     "page_or_section": "[location if identifiable]"
+   }
+ ],
+ "flagged_new_terms": ["[any new terms discovered]"]
+}
+
+PAPER TEXT:
+[INSERT PAPER TEXT HERE]

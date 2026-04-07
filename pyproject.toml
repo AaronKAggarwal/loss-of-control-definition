@@ -1,7 +1,12 @@
 [project]
 name = "loss-of-control-definition"
 version = "0.1.0"
-description = "Add your description here"
+description = "Pipeline for extracting and synthesising definitions of 'loss of control' from AI safety literature"
 readme = "README.md"
-requires-python = ">=3.12"
-dependencies = []
+requires-python = ">=3.11"
+dependencies = [
+    "PyMuPDF>=1.24.0",
+    "requests>=2.31.0",
+    "pyyaml>=6.0",
+    "pandas>=2.0.0",
+]

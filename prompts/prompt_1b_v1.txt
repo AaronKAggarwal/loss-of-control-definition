@@ -1,0 +1,65 @@
+You are a research assistant performing concept analysis. You have
+been given a set of definitions and characterizations of "loss of
+control" extracted from multiple academic papers. Your task is to
+identify characteristics that appear REPEATEDLY across these
+definitions.
+
+INSTRUCTIONS:
+
+1. Read ALL the definitions provided below.
+
+2. Identify characteristics, properties, conditions, or features
+  that appear in MORE THAN ONE definition. These are candidate
+  defining attributes.
+
+3. For each candidate attribute:
+  - State the attribute clearly in a short phrase
+  - List WHICH definitions contain this attribute (by paper_id
+    and quote number)
+  - Provide the specific phrases from each definition that
+    express this attribute
+  - Count how many definitions contain this attribute
+
+4. Also list any characteristics that appear in ONLY ONE
+  definition. These are not recurring but may still be relevant.
+  The human researcher will decide.
+
+5. CRITICAL RULES:
+  - Only identify attributes that are PRESENT in the definitions
+    provided. Do not add attributes from your own knowledge.
+  - Two phrases express the same attribute if they describe the
+    same underlying concept, even if worded differently.
+  - If you are uncertain whether two phrases express the same
+    attribute, list them separately and flag the uncertainty.
+
+OUTPUT FORMAT (JSON):
+{
+ "recurring_attributes": [
+   {
+     "attribute": "[short phrase describing the attribute]",
+     "count": [number of definitions containing it],
+     "sources": [
+       {
+         "paper_id": "[id]",
+         "supporting_phrase": "[exact phrase from definition]"
+       }
+     ]
+   }
+ ],
+ "single_occurrence_attributes": [
+   {
+     "attribute": "[short phrase]",
+     "source_paper_id": "[id]",
+     "supporting_phrase": "[exact phrase]"
+   }
+ ],
+ "uncertain_groupings": [
+   {
+     "note": "[description of uncertainty]",
+     "phrases": ["[phrase 1]", "[phrase 2]"]
+   }
+ ]
+}
+
+EXTRACTED DEFINITIONS:
+[INSERT ALL COMPILED DEFINITIONS FROM PROMPT 1a HERE]
