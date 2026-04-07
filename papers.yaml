@@ -1,8 +1,125 @@
-# Paper registry: single source of truth for the corpus.
-# Populate with all 22 papers before running the pipeline.
-# The pipeline iterates over this list, not over whatever PDFs exist in a folder.
 papers:
-  # - id: carlsmith_2023
-  #   filename: "Carlsmith_2023_Is_Power_Seeking_AI_An_Existential_Risk.pdf"
-  #   citation: "Carlsmith, J. (2023). Is Power-Seeking AI an Existential Risk?"
-  #   notes: ""
+  - id: macaskill_2025
+    filename: "Forethought_Preparing for the Intelligence Explosion.pdf"
+    citation: "MacAskill, W. & Moorhouse, F. (2025). Preparing for the Intelligence Explosion. Forethought."
+    notes: ""
+
+  - id: bengio_2024
+    filename: "Bengio 2024_Managing extreme AI risks amid rapid progress.pdf"
+    citation: "Bengio, Y. et al. (2024). Managing extreme AI risks amid rapid progress."
+    notes: ""
+
+  - id: chan_2023
+    filename: "Chan 2023_Harms from Increasingly Agentic Algorithmic Systems.pdf"
+    citation: "Chan, A. et al. (2023). Harms from Increasingly Agentic Algorithmic Systems."
+    notes: ""
+
+  - id: hendrycks_2023
+    filename: "Hendrycks 2023_An Overview of Catastrophic AI Risks.pdf"
+    citation: "Hendrycks, D., Mazeika, M. & Woodside, T. (2023). An Overview of Catastrophic AI Risks."
+    notes: ""
+
+  - id: chin_2025
+    filename: "Chin 2025_Dimensional Characterization and Pathway Modeling for Catastrophic AI Risks.pdf"
+    citation: "Chin, Z.S. (2025). Dimensional Characterization and Pathway Modeling for Catastrophic AI Risks."
+    notes: ""
+
+  - id: critch_2023
+    filename: "Critch 2023_TASRA- a Taxonomy and Analysis of Societal-Scale Risks from AI.pdf"
+    citation: "Critch, A. & Russell, S. (2023). TASRA: A Taxonomy and Analysis of Societal-Scale Risks from AI."
+    notes: ""
+
+  - id: hanson_age_of_em
+    filename: "Book (part only)_The Age of Em.pdf"
+    citation: "Hanson, R. (2016). The Age of Em (selected chapters)."
+    notes: "Partial book extract"
+
+  - id: rand_pivots_pathways
+    filename: "RAND_Pivots and Pathways on the Road to Artificial General Intelligence Futures.pdf"
+    citation: "Chessen, M. & Chowdhury, S. (2025). Pivots and Pathways on the Road to Artificial General Intelligence Futures. RAND."
+    notes: "Swaptik's paper — check author order with him"
+
+  - id: bostrom_superintelligence
+    filename: "Book (part only)_Superintelligence.pdf"
+    citation: "Bostrom, N. (2014). Superintelligence: Paths, Dangers, Strategies (selected chapters)."
+    notes: "Partial book extract"
+
+  - id: barrett_2026
+    filename: "Barrett 2026_A Model of Pathways to Artificial Superintelligence Catastrophe for Risk and Decision Analysis.pdf"
+    citation: "Barrett, A. et al. (2026). A Model of Pathways to Artificial Superintelligence Catastrophe for Risk and Decision Analysis."
+    notes: ""
+
+  - id: cigi_ai_national_security
+    filename: "CIGI_AI National Security Scenarios.pdf"
+    citation: "Cass-Beggs, D. et al. (2025). AI National Security Scenarios. CIGI Special Report."
+    notes: ""
+
+  - id: ist_loss_of_control
+    filename: "IST_A Loss of Control Risk.pdf"
+    citation: "Tkeshelashvili, M., Verma, R. & Kelly, S.M. (2026). AI Loss of Control Risk: Indications & Warning. Institute for Security and Technology."
+    notes: ""
+
+  - id: kasirzadeh_2025
+    filename: "Kasirzadeh 2025_Two types of AI existential risk- decisive and accumulative.pdf"
+    citation: "Kasirzadeh, A. (2025). Two types of AI existential risk: decisive and accumulative. Philosophical Studies, 182(7), 1975–2003."
+    notes: ""
+
+  - id: rand_loc_response_planning
+    filename: "RAND_The Case for AI Loss of Control Response Planning and an Outline to Get Started.pdf"
+    citation: "Boudreaux, B., Vermeer, M.J.D., Horton, K. & Kalra, N. The Case for AI Loss of Control Response Planning and an Outline to Get Started. RAND."
+    notes: ""
+
+  - id: rand_rise_fall_nations
+    filename: "RAND_How Artificial General Intelligence Could Affect the Rise and Fall of Nations.pdf"
+    citation: "Pavel, B., Ke, I., Smith, G., Brown-Heidenreich, S., Sabbag, L., Acharya, A. & Mahmood, Y. How Artificial General Intelligence Could Affect the Rise and Fall of Nations. RAND."
+    notes: ""
+
+  - id: carlsmith_2021
+    filename: "Carlsmith 2021_Is Power-Seeking AI an Existential Risk_.pdf"
+    citation: "Carlsmith, J. (2021). Is Power-Seeking AI an Existential Risk?"
+    notes: ""
+
+  - id: kulveit_2025
+    filename: "Kulveit 2025_Gradual Disempowerment- Systemic Existential Risks from Incremental AI Development.pdf"
+    citation: "Kulveit, J. et al. (2025). Gradual Disempowerment: Systemic Existential Risks from Incremental AI Development."
+    notes: ""
+
+  - id: bales_2024
+    filename: "GPI_AI takeover and human disempowerment.pdf"
+    citation: "Bales, A. (2024). AI takeover and human disempowerment. The Philosophical Quarterly, 75(3), 791–811."
+    notes: ""
+
+  - id: dsit_frontier_ai
+    filename: "DSIT_Capabilities and risks from frontier AI.pdf"
+    citation: "DSIT. Capabilities and risks from frontier AI."
+    notes: ""
+
+  - id: rand_five_hard_problems
+    filename: "RAND_Artificial General Intelligence_s Five Hard National Security Problems.pdf"
+    citation: "Mitre, J. & Predd, J.B. Artificial General Intelligence's Five Hard National Security Problems. RAND."
+    notes: ""
+
+  - id: ngo_2024
+    filename: "Ngo 2024_The Alignment Problem from a Deep Learning Perspective.pdf"
+    citation: "Ngo, R. et al. (2024). The Alignment Problem from a Deep Learning Perspective."
+    notes: ""
+
+  - id: cotra_2022
+    filename: "Cotra 2022_Without specific countermeasures, the easiest path to transformative AI likely leads to AI takeover.pdf"
+    citation: "Cotra, A. (2022). Without specific countermeasures, the easiest path to transformative AI likely leads to AI takeover."
+    notes: ""
+
+  - id: amodei_2026
+    filename: "Amodei 2026_The Adolescence of Technology.pdf"
+    citation: "Amodei, D. (2026). The Adolescence of Technology."
+    notes: ""
+
+  - id: oecd_ai_risks
+    filename: "OECD_Assessing Potential Future Artificial Intelligence Risks, Benefits and Policy Imperatives.pdf"
+    citation: "Berryhill, J., Hobbs, H. & Docherty, D. (2024). Assessing Potential Future Artificial Intelligence Risks, Benefits and Policy Imperatives. OECD."
+    notes: "Expert Group co-chaired by Russell, Rossi & Schönstein"
+
+  - id: dafoe_2020
+    filename: "Dafoe 2020_AI Governance_ Opportunity and Theory of Impact.pdf"
+    citation: "Dafoe, A. (2020). AI Governance: Opportunity and Theory of Impact."
+    notes: ""
