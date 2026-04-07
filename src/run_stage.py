@@ -6,7 +6,6 @@ import re
 import time
 from datetime import datetime, timezone
 
-import requests
 import yaml
 
 from src.utils.hf_client import query_llm
@@ -140,7 +139,7 @@ def run_1a(
                 temperature=config.get("temperature", 0.1),
                 dry_run=dry_run,
             )
-        except requests.HTTPError as e:
+        except Exception as e:
             paper_latency = round(time.time() - paper_start, 2)
             msg = f"API error: {e}"
             print(f"  [{i}/{total}] ERROR {paper_id} — {msg}")

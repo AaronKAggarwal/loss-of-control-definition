@@ -1,13 +1,14 @@
 """HuggingFace Inference API wrapper.
 
-Uses requests directly rather than huggingface_hub — fewer dependencies,
-more transparent request/response handling, easier to debug API issues.
+Uses huggingface_hub's InferenceClient with a provider parameter.
+This routes requests to the provider directly (e.g. nscale), giving
+full 128K+ context — unlike the raw router endpoint which caps at 8K.
 """
 
 import json
 import time
 
-import requests
+from huggingface_hub import InferenceClient
 
 
 # Mock response for --dry-run testing. Mirrors the structure of a real
@@ -35,10 +36,11 @@ def query_llm(
     hf_token: str,
     temperature: float = 0.1,
     max_new_tokens: int = 4096,
+    provider: str = "nscale",
     return_full_response: bool = True,
     dry_run: bool = False,
 ) -> dict:
-    """Send a prompt to the HuggingFace Inference API.
+    """Send a prompt to the HuggingFace Inference API via InferenceClient.
 
     Args:
         prompt: The full prompt string to send.
@@ -46,6 +48,8 @@ def query_llm(
         hf_token: HuggingFace API token.
         temperature: Sampling temperature. Default 0.1 for high-fidelity extraction.
         max_new_tokens: Maximum tokens to generate.
+        provider: Inference provider (e.g. "nscale"). Routes to the provider
+                  directly for full context length support.
         return_full_response: If True, include raw API response in output.
         dry_run: If True, return a mock response without calling the API.
 
@@ -57,7 +61,7 @@ def query_llm(
           - latency_seconds: round-trip time (0.0 for dry runs)
 
     Raises:
-        requests.HTTPError: After 3 retries on recoverable errors.
+        HfHubHTTPError: After 3 retries on recoverable errors.
     """
     if dry_run:
         mock_text = json.dumps(MOCK_RESPONSE, indent=2)
@@ -68,19 +72,7 @@ def query_llm(
             "latency_seconds": 0.0,
         }
 
-    # Uses the HF Router endpoint (OpenAI-compatible chat completions).
-    # The old api-inference.huggingface.co endpoint returns 410 Gone.
-    url = "https://router.huggingface.co/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {hf_token}",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "model": model,
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": temperature,
-        "max_tokens": max_new_tokens,
-    }
+    client = InferenceClient(model=model, provider=provider, token=hf_token)
 
     # Retry on 503 (model loading) and 429 (rate limit) with exponential backoff.
     # 3 attempts total: wait 10s, then 30s before giving up.
@@ -89,30 +81,35 @@ def query_llm(
 
     for attempt in range(max_retries):
         start = time.time()
-        response = requests.post(url, headers=headers, json=payload, timeout=300)
-        latency = time.time() - start
-
-        if response.status_code == 200:
+        try:
+            response = client.chat.completions.create(
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=max_new_tokens,
+                temperature=temperature,
+            )
+            latency = time.time() - start
             break
+        except Exception as e:
+            latency = time.time() - start
+            error_str = str(e)
 
-        # Recoverable errors: model loading (503) or rate limit (429)
-        if response.status_code in (503, 429) and attempt < max_retries - 1:
-            wait = backoff_seconds[attempt]
-            print(f"  [RETRY] {response.status_code} — waiting {wait}s (attempt {attempt + 1}/{max_retries})")
-            time.sleep(wait)
-            continue
+            # Check for recoverable HTTP status codes in the error message
+            is_recoverable = any(code in error_str for code in ("503", "429"))
+            if is_recoverable and attempt < max_retries - 1:
+                wait = backoff_seconds[attempt]
+                print(f"  [RETRY] {error_str[:100]} — waiting {wait}s (attempt {attempt + 1}/{max_retries})")
+                time.sleep(wait)
+                continue
 
-        # Non-recoverable or final attempt — print body for debugging, then raise
-        print(f"  [ERROR] {response.status_code}: {response.text[:300]}")
-        response.raise_for_status()
+            # Non-recoverable or final attempt
+            print(f"  [ERROR] {error_str[:300]}")
+            raise
 
-    raw = response.json()
-
-    # OpenAI-compatible response: choices[0].message.content
+    # Extract generated text from OpenAI-compatible response
     try:
-        generated_text = raw["choices"][0]["message"]["content"]
-    except (KeyError, IndexError, TypeError):
-        generated_text = str(raw)
+        generated_text = response.choices[0].message.content
+    except (AttributeError, IndexError, TypeError):
+        generated_text = str(response)
 
     result = {
         "generated_text": generated_text,
@@ -120,10 +117,22 @@ def query_llm(
     }
 
     if return_full_response:
+        # Serialize the response object for logging
+        try:
+            raw = json.loads(response.to_json())
+        except (AttributeError, TypeError, json.JSONDecodeError):
+            raw = str(response)
         result["raw_response"] = raw
 
-    # OpenAI-compatible usage block (prompt_tokens, completion_tokens, total_tokens)
-    result["usage"] = raw.get("usage") if isinstance(raw, dict) else None
+    # Extract usage if available
+    try:
+        usage = response.usage
+        result["usage"] = {
+            "prompt_tokens": usage.prompt_tokens,
+            "completion_tokens": usage.completion_tokens,
+        } if usage else None
+    except AttributeError:
+        result["usage"] = None
 
     return result
 
