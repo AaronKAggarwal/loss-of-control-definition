@@ -137,6 +137,7 @@ def run_1a(
                 model=config["model"],
                 hf_token=hf_token,
                 temperature=config.get("temperature", 0.1),
+                provider=config.get("provider", "nscale"),
                 dry_run=dry_run,
             )
         except Exception as e:
