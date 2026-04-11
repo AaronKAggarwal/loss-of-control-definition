@@ -35,7 +35,7 @@ def query_llm(
     model: str,
     hf_token: str,
     temperature: float = 0.1,
-    max_new_tokens: int = 4096,
+    max_new_tokens: int = 8192,
     provider: str = "nscale",
     return_full_response: bool = True,
     dry_run: bool = False,
