@@ -48,11 +48,23 @@ def _replace_placeholder(template: str, placeholder: str, replacement: str, labe
 def fill_prompt_1a(template: str, seed_terms: list[str], paper_text: str) -> str:
     """Fill Prompt 1a with seed terms and paper text.
 
-    Seed terms are formatted as a comma-separated quoted list, matching
-    the style shown in the placeholder example text.
+    Format depends on prompt version:
+      - v1 (header "SEED TERMS TO SEARCH FOR:"): comma-separated quoted list
+        to match the placeholder example style.
+      - v2 (header "SEED TERMS:"): bulleted list ("- term") to match
+        Swaptik's intended format.
     """
-    # Format: "term1", "term2", "term3"
-    formatted_terms = ", ".join(f'"{term}"' for term in seed_terms)
+    # Detect v2 by its header. v1 has "SEED TERMS TO SEARCH FOR:",
+    # v2 has just "SEED TERMS:". Check for the v1 header specifically
+    # so any future version defaults to bulleted format.
+    is_v1 = "SEED TERMS TO SEARCH FOR:" in template
+
+    if is_v1:
+        # Format: "term1", "term2", "term3"
+        formatted_terms = ", ".join(f'"{term}"' for term in seed_terms)
+    else:
+        # Format: - term1\n- term2\n- term3
+        formatted_terms = "\n".join(f"- {term}" for term in seed_terms)
 
     result = _replace_placeholder(template, PLACEHOLDER_1A_SEED_TERMS, formatted_terms, "seed terms")
     result = _replace_placeholder(result, PLACEHOLDER_1A_PAPER_TEXT, paper_text, "paper text")
@@ -72,35 +84,55 @@ def fill_prompt_1d(template: str, verified_attributes_json: str) -> str:
 if __name__ == "__main__":
     import os
 
-    # Test: load prompt_1a_v1.txt, fill with dummy data, verify placeholders replaced.
-    prompt_path = os.path.join(os.path.dirname(__file__), "..", "..", "prompts", "prompt_1a_v1.txt")
-    template = load_prompt(prompt_path)
-
-    dummy_terms = ["loss of control", "control failure", "corrigibility"]
+    prompts_dir = os.path.join(os.path.dirname(__file__), "..", "..", "prompts")
     dummy_text = "This is dummy paper text for testing placeholder replacement."
 
-    filled = fill_prompt_1a(template, dummy_terms, dummy_text)
+    # --- Test v1 ---
+    print("=== V1 TEST ===\n")
+    template_v1 = load_prompt(os.path.join(prompts_dir, "prompt_1a_v1.txt"))
+    dummy_terms_v1 = ["loss of control", "control failure", "corrigibility"]
 
-    # Verify placeholders are gone
-    assert PLACEHOLDER_1A_SEED_TERMS not in filled, "Seed terms placeholder was NOT replaced!"
-    assert PLACEHOLDER_1A_PAPER_TEXT not in filled, "Paper text placeholder was NOT replaced!"
+    filled_v1 = fill_prompt_1a(template_v1, dummy_terms_v1, dummy_text)
 
-    # Verify replacements are present
-    assert '"loss of control", "control failure", "corrigibility"' in filled, "Seed terms not found in output!"
-    assert dummy_text in filled, "Paper text not found in output!"
+    assert PLACEHOLDER_1A_SEED_TERMS not in filled_v1, "Seed terms placeholder was NOT replaced!"
+    assert PLACEHOLDER_1A_PAPER_TEXT not in filled_v1, "Paper text placeholder was NOT replaced!"
+    assert '"loss of control", "control failure", "corrigibility"' in filled_v1, "V1 terms should be comma-separated!"
 
-    lines = filled.splitlines()
-    print(f"Total lines: {len(lines)}")
-    print("\n--- First 30 lines ---")
-    print("\n".join(lines[:30]))
-    print("\n--- Last 10 lines ---")
-    print("\n".join(lines[-10:]))
+    lines_v1 = filled_v1.splitlines()
+    # Show the seed terms line
+    for line in lines_v1:
+        if "loss of control" in line and "control failure" in line:
+            print(f"V1 format: {line.strip()}")
+            break
 
-    # Also test that missing placeholder raises ValueError
+    # --- Test v2 ---
+    print("\n=== V2 TEST ===\n")
+    template_v2 = load_prompt(os.path.join(prompts_dir, "prompt_1a_v2.txt"))
+    dummy_terms_v2 = ["loss of control", "losing control", "uncontrollable"]
+
+    filled_v2 = fill_prompt_1a(template_v2, dummy_terms_v2, dummy_text)
+
+    assert PLACEHOLDER_1A_SEED_TERMS not in filled_v2, "Seed terms placeholder was NOT replaced!"
+    assert PLACEHOLDER_1A_PAPER_TEXT not in filled_v2, "Paper text placeholder was NOT replaced!"
+    assert "- loss of control" in filled_v2, "V2 terms should be bulleted!"
+    assert "- losing control" in filled_v2, "V2 terms should be bulleted!"
+    assert '"loss of control"' not in filled_v2, "V2 terms should NOT be quoted!"
+
+    lines_v2 = filled_v2.splitlines()
+    print("V2 format:")
+    for line in lines_v2:
+        if line.strip().startswith("- ") and "control" in line.lower():
+            print(f"  {line}")
+
+    # Show first 15 lines of v2 filled prompt
+    print("\n--- V2 first 15 lines ---")
+    print("\n".join(lines_v2[:15]))
+
+    # --- Test double-fill raises ---
     try:
-        fill_prompt_1a(filled, dummy_terms, dummy_text)
+        fill_prompt_1a(filled_v1, dummy_terms_v1, dummy_text)
         print("\n[FAIL] Should have raised ValueError on double-fill!")
     except ValueError as e:
-        print(f"\n[OK] Double-fill correctly raised: {e}")
+        print(f"\n[OK] Double-fill correctly raised ValueError")
 
-    print("\n[OK] All prompt.py tests passed.")
+    print("\n[OK] All prompt.py tests passed (v1 + v2).")
