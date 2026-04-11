@@ -80,7 +80,12 @@ def run_1a(
     papers_path = os.path.join(repo_root, "papers.yaml")
     papers_config = _load_yaml(papers_path)["papers"]
 
-    seed_terms_path = os.path.join(repo_root, "seed_terms.yaml")
+    # Load seed terms from versioned file: seed_terms.yaml (v1) or seed_terms_v2.yaml (v2)
+    seed_version = config.get("seed_terms_version", "v1")
+    if seed_version == "v1":
+        seed_terms_path = os.path.join(repo_root, "seed_terms.yaml")
+    else:
+        seed_terms_path = os.path.join(repo_root, f"seed_terms_{seed_version}.yaml")
     seed_data = _load_yaml(seed_terms_path)
     seed_terms = seed_data["terms"]
 
@@ -177,13 +182,15 @@ def run_1a(
         # Save parsed output
         _save_json(parsed, output_path)
 
-        num_defs = len(parsed.get("definitions_found", []))
-        print(f"  [{i}/{total}] OK {paper_id} — {num_defs} definitions, {paper_latency}s")
+        # Handle both v1 (definitions_found) and v2 (passages_found) schemas
+        items = parsed.get("definitions_found", parsed.get("passages_found", []))
+        num_items = len(items)
+        print(f"  [{i}/{total}] OK {paper_id} — {num_items} extractions, {paper_latency}s")
 
         per_paper_meta.append({
             "paper_id": paper_id,
             "skipped": False,
-            "definitions_found": num_defs,
+            "extractions_found": num_items,
             "latency_seconds": paper_latency,
             "usage": result.get("usage"),
         })

@@ -57,19 +57,19 @@ def _generate_review_md(
     lines.append("")
     lines.append("---")
 
-    definitions = extractions.get("definitions_found", [])
+    # Handle both v1 (definitions_found) and v2 (passages_found) schemas
+    items = extractions.get("definitions_found", extractions.get("passages_found", []))
+    is_v2 = "passages_found" in extractions
 
-    if not definitions:
+    if not items:
         lines.append("")
-        lines.append("*No definitions found in this paper.*")
+        lines.append("*No extractions found in this paper.*")
         return "\n".join(lines)
 
-    for i, defn in enumerate(definitions, 1):
-        quote = defn.get("quote", "")
-        term = defn.get("term", "")
-        def_type = defn.get("type", "")
-        new_term = defn.get("new_term", False)
-        grounding_note = defn.get("grounding_note", "")
+    for i, item in enumerate(items, 1):
+        quote = item.get("quote", "")
+        # v1 uses "term", v2 uses "seed_term_matched"
+        term = item.get("term", item.get("seed_term_matched", ""))
 
         # Run quote verification against source text
         verification = verify_quote(quote, raw_text)
@@ -88,8 +88,19 @@ def _generate_review_md(
         lines.append(f"## Extraction {i}")
         lines.append("")
         lines.append(f"**Term:** {term}")
-        lines.append(f"**Type:** {def_type}")
-        lines.append(f"**New term:** {'yes' if new_term else 'no'}")
+
+        # v1-only fields: type, new_term, grounding_note
+        if not is_v2:
+            def_type = item.get("type", "")
+            new_term = item.get("new_term", False)
+            lines.append(f"**Type:** {def_type}")
+            lines.append(f"**New term:** {'yes' if new_term else 'no'}")
+
+        # v2 has "location" instead of "page_or_section"
+        location = item.get("page_or_section", item.get("location", ""))
+        if location:
+            lines.append(f"**Location:** {location}")
+
         lines.append("")
         lines.append("**Extracted quote:**")
         lines.append(f"> {quote}")
@@ -98,8 +109,13 @@ def _generate_review_md(
         lines.append(f"> {context_str}")
         lines.append("")
         lines.append(f"**Quote verification:** {verify_str}")
-        lines.append("")
-        lines.append(f"**Grounding note:** {grounding_note}")
+
+        # v1-only: grounding note
+        if not is_v2:
+            grounding_note = item.get("grounding_note", "")
+            lines.append("")
+            lines.append(f"**Grounding note:** {grounding_note}")
+
         lines.append("")
         lines.append("**Reviewer decision:** [ ] Accept  [ ] Reject  [ ] Needs discussion")
         lines.append("")
@@ -193,42 +209,44 @@ def generate_review_docs(
         with open(review_path, "w", encoding="utf-8") as f:
             f.write(review_md)
 
-        # Compute summary stats
-        definitions = extractions.get("definitions_found", [])
-        num_defs = len(definitions)
-        num_explicit = sum(1 for d in definitions if d.get("type") == "EXPLICIT")
-        num_characterization = sum(1 for d in definitions if d.get("type") == "CHARACTERIZATION")
-        num_new_terms = sum(1 for d in definitions if d.get("new_term"))
-        flagged_terms = extractions.get("flagged_new_terms", [])
+        # Compute summary stats — handle both v1 and v2 schemas
+        items = extractions.get("definitions_found", extractions.get("passages_found", []))
+        is_v2 = "passages_found" in extractions
+        num_items = len(items)
 
         # Run verification to count verified/unverified
         num_verified = 0
         num_unverified = 0
-        for defn in definitions:
-            v = verify_quote(defn.get("quote", ""), raw_text)
+        for item in items:
+            v = verify_quote(item.get("quote", ""), raw_text)
             if v["found"]:
                 num_verified += 1
             else:
                 num_unverified += 1
 
-        summary_rows.append({
+        row = {
             "paper_id": paper_id,
             "citation": citation,
-            "num_definitions_found": num_defs,
-            "num_explicit": num_explicit,
-            "num_characterization": num_characterization,
-            "num_new_terms": num_new_terms,
+            "num_extractions": num_items,
             "num_verified_quotes": num_verified,
             "num_unverified_quotes": num_unverified,
-            "flagged_new_terms": ";".join(flagged_terms),
-        })
+        }
+
+        # v1-only summary columns
+        if not is_v2:
+            row["num_explicit"] = sum(1 for d in items if d.get("type") == "EXPLICIT")
+            row["num_characterization"] = sum(1 for d in items if d.get("type") == "CHARACTERIZATION")
+            row["num_new_terms"] = sum(1 for d in items if d.get("new_term"))
+            row["flagged_new_terms"] = ";".join(extractions.get("flagged_new_terms", []))
+
+        summary_rows.append(row)
 
         # Add to consolidated with paper_id on each extraction
-        for defn in definitions:
-            entry = {"paper_id": paper_id, **defn}
+        for item in items:
+            entry = {"paper_id": paper_id, **item}
             all_extractions.append(entry)
 
-        print(f"  [OK] {paper_id} — review doc generated ({num_defs} definitions)")
+        print(f"  [OK] {paper_id} — review doc generated ({num_items} extractions)")
 
     # Write summary.csv
     summary_path = os.path.join(exp_dir, "summary.csv")
@@ -395,33 +413,64 @@ if __name__ == "__main__":
         with open(os.path.join(exp_dir, "run_metadata.json"), "w") as f:
             json.dump(run_meta, f)
 
-        # Run generate_review_docs
-        print("=== GENERATE REVIEW DOCS TEST ===\n")
+        # Run generate_review_docs (v1 schema)
+        print("=== V1 SCHEMA TEST ===\n")
         generate_review_docs(config, tmpdir, repo_root=tmpdir)
 
-        # Show results
-        review_dir = os.path.join(exp_dir, "review")
-        for fname in sorted(os.listdir(review_dir)):
-            path = os.path.join(review_dir, fname)
-            print(f"\n{'=' * 60}")
-            print(f"  {fname}")
-            print(f"{'=' * 60}")
-            with open(path, "r") as f:
-                print(f.read())
+        # Show one review doc
+        review_dir_path = os.path.join(exp_dir, "review")
+        with open(os.path.join(review_dir_path, "smith_2024.md"), "r") as f:
+            print(f.read()[:600])
+        print("...\n")
 
-        print(f"\n{'=' * 60}")
-        print("  summary.csv")
-        print(f"{'=' * 60}")
-        with open(os.path.join(exp_dir, "summary.csv"), "r") as f:
+        # --- V2 schema test ---
+        print("=== V2 SCHEMA TEST ===\n")
+        exp_dir_v2 = os.path.join(
+            tmpdir, "stages", "1a_definition_extraction",
+            "experiments", "exp002_v2_test",
+        )
+        outputs_dir_v2 = os.path.join(exp_dir_v2, "outputs")
+        os.makedirs(outputs_dir_v2)
+
+        # v2 output uses passages_found and seed_term_matched
+        smith_v2_output = {
+            "paper_id": "smith_2024",
+            "passages_found": [
+                {
+                    "quote": (
+                        "We define loss of control as a situation in which humans can no "
+                        "longer direct, correct, or shut down an AI system that is pursuing "
+                        "objectives misaligned with human values."
+                    ),
+                    "seed_term_matched": "loss of control",
+                    "location": "Section 1",
+                },
+            ],
+        }
+        with open(os.path.join(outputs_dir_v2, "smith_2024.json"), "w") as f:
+            json.dump(smith_v2_output, f)
+
+        config_v2 = {
+            "experiment": "exp002_v2_test",
+            "model": "meta-llama/Llama-3.1-70B-Instruct",
+            "temperature": 0.1,
+            "prompt_version": "prompt_1a_v2",
+        }
+        with open(os.path.join(exp_dir_v2, "config.json"), "w") as f:
+            json.dump(config_v2, f)
+        with open(os.path.join(exp_dir_v2, "run_metadata.json"), "w") as f:
+            json.dump(run_meta, f)
+
+        generate_review_docs(config_v2, tmpdir, repo_root=tmpdir)
+
+        review_dir_v2 = os.path.join(exp_dir_v2, "review")
+        with open(os.path.join(review_dir_v2, "smith_2024.md"), "r") as f:
             print(f.read())
 
+        print(f"\n{'=' * 60}")
+        print("  summary.csv (v2)")
         print(f"{'=' * 60}")
-        print("  consolidated.json")
-        print(f"{'=' * 60}")
-        with open(os.path.join(exp_dir, "consolidated.json"), "r") as f:
-            data = json.load(f)
-            print(f"{len(data)} total extractions across all papers")
-            for entry in data:
-                print(f"  - [{entry['paper_id']}] {entry['term']} ({entry['type']})")
+        with open(os.path.join(exp_dir_v2, "summary.csv"), "r") as f:
+            print(f.read())
 
-        print("\n[OK] All generate_review.py tests passed.")
+        print("\n[OK] All generate_review.py tests passed (v1 + v2).")

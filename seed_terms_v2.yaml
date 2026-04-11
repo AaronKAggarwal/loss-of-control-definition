@@ -1,0 +1,13 @@
+# Seed terms for definition extraction prompts.
+# Draft list — should be validated against the literature review spreadsheet's
+# "How the paper defines Loss of Control" column before first run.
+version: v2
+terms:
+  - "loss of control"
+  - "losing control"
+  - "lose control"
+  - "loss of human control"
+  - "uncontrollable"
+  - "uncontrolled"
+  - "beyond human control"
+  - "inability to control"
