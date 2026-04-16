@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 import yaml
 
 from src.utils.hf_client import query_llm
-from src.utils.prompt import fill_prompt_1a, load_prompt
+from src.utils.prompt import fill_prompt_1a, fill_prompt_1d, load_prompt
 
 
 def _load_yaml(path: str) -> dict:
@@ -228,9 +228,144 @@ def run_1b(config: dict, drive_root: str, hf_token: str) -> None:
     raise NotImplementedError("run_1b is blocked on human review of 1a outputs")
 
 
-def run_1d(config: dict, drive_root: str, hf_token: str) -> None:
-    """Run Prompt 1d on verified attributes. (Not yet implemented.)"""
-    raise NotImplementedError("run_1d is blocked on human review of 1b outputs")
+def run_1d(
+    config: dict,
+    drive_root: str,
+    hf_token: str,
+    repo_root: str = ".",
+    force: bool = False,
+    dry_run: bool = False,
+) -> None:
+    """Run Prompt 1d to synthesise verified attributes into an operational definition.
+
+    Args:
+        config: Dict with keys: experiment, model, temperature, prompt_version,
+                and optionally provider.
+        drive_root: Path to the Google Drive project root.
+        hf_token: HuggingFace API token.
+        repo_root: Path to the repo root (for loading prompts).
+        force: If True, re-run even if output already exists.
+        dry_run: If True, use mock API response.
+
+    Reads:  stages/1d_definition_synthesis/verified/verified_attributes.txt
+    Writes: stages/1d_definition_synthesis/experiments/{experiment}/output.json
+    """
+    run_start = time.time()
+    timestamp = datetime.now(timezone.utc).isoformat()
+
+    # --- Set up experiment directory ---
+    exp_dir = os.path.join(
+        drive_root, "stages", "1d_definition_synthesis",
+        "experiments", config["experiment"],
+    )
+    logs_dir = os.path.join(exp_dir, "logs")
+    os.makedirs(exp_dir, exist_ok=True)
+    os.makedirs(logs_dir, exist_ok=True)
+
+    output_path = os.path.join(exp_dir, "output.json")
+
+    # Resume-safe: skip if output exists unless force=True
+    if os.path.exists(output_path) and not force:
+        print(f"Output already exists for experiment '{config['experiment']}'. Use force=True to re-run.")
+        return
+
+    # --- Load verified attributes (one per line) ---
+    attributes_path = os.path.join(
+        drive_root, "stages", "1d_definition_synthesis",
+        "verified", "verified_attributes.txt",
+    )
+    if not os.path.exists(attributes_path):
+        raise FileNotFoundError(
+            f"Verified attributes not found: {attributes_path}\n"
+            "This file should contain one attribute per line, produced after human review of 1B output."
+        )
+
+    with open(attributes_path, "r", encoding="utf-8") as f:
+        # Strip whitespace and skip blank lines
+        attributes = [line.strip() for line in f if line.strip()]
+
+    if not attributes:
+        raise ValueError(f"No attributes found in {attributes_path}")
+
+    print(f"Loaded {len(attributes)} verified attributes.")
+
+    # --- Load and fill prompt ---
+    prompt_path = os.path.join(repo_root, "prompts", f"{config['prompt_version']}.txt")
+    template = load_prompt(prompt_path)
+
+    # Format as bulleted list — matches the example format Swaptik used in the prompt
+    formatted_attributes = "\n".join(f"- {attr}" for attr in attributes)
+    filled_prompt = fill_prompt_1d(template, formatted_attributes)
+
+    # --- Call LLM ---
+    print(f"Calling {config['model']}...")
+    paper_start = time.time()
+    try:
+        result = query_llm(
+            prompt=filled_prompt,
+            model=config["model"],
+            hf_token=hf_token,
+            temperature=config.get("temperature", 0.1),
+            provider=config.get("provider", "nscale"),
+            dry_run=dry_run,
+        )
+    except Exception as e:
+        latency = round(time.time() - paper_start, 2)
+        msg = f"API error: {e}"
+        print(f"  [ERROR] {msg}")
+        # Save metadata even on failure for debugging
+        metadata = {
+            "timestamp": timestamp,
+            "total_runtime_seconds": round(time.time() - run_start, 2),
+            "latency_seconds": latency,
+            "error": msg,
+            "num_attributes": len(attributes),
+        }
+        _save_json(metadata, os.path.join(exp_dir, "run_metadata.json"))
+        raise
+    latency = round(time.time() - paper_start, 2)
+
+    generated_text = result["generated_text"]
+
+    # Save raw API response
+    _save_json(result.get("raw_response", {}), os.path.join(logs_dir, "raw_response.json"))
+
+    # --- Save output ---
+    # Try to parse as JSON first; if the model returned plain text (which is
+    # likely for 1D since the prompt asks for a prose definition, not JSON),
+    # wrap it in a dict so output.json is always valid JSON.
+    parsed = _parse_json_response(generated_text)
+    if parsed is None:
+        output = {
+            "operational_definition": generated_text,
+            "format": "text",
+        }
+    else:
+        output = parsed
+
+    _save_json(output, output_path)
+
+    # --- Save config snapshot ---
+    config_snapshot = {
+        **config,
+        "verified_attributes": attributes,
+        "dry_run": dry_run,
+        "force": force,
+    }
+    _save_json(config_snapshot, os.path.join(exp_dir, "config.json"))
+
+    # --- Save run metadata ---
+    total_runtime = round(time.time() - run_start, 2)
+    metadata = {
+        "timestamp": timestamp,
+        "total_runtime_seconds": total_runtime,
+        "latency_seconds": latency,
+        "num_attributes": len(attributes),
+        "usage": result.get("usage"),
+    }
+    _save_json(metadata, os.path.join(exp_dir, "run_metadata.json"))
+
+    print(f"\nDone in {total_runtime}s. Output saved to {output_path}")
 
 
 if __name__ == "__main__":
