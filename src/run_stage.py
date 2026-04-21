@@ -1,4 +1,4 @@
-"""Main entry points for each pipeline stage: run_1a(), run_1b(), run_1d()."""
+"""Main entry points for each pipeline stage."""
 
 import json
 import os
@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 import yaml
 
 from src.utils.hf_client import query_llm
-from src.utils.prompt import fill_prompt_1a, fill_prompt_1d, load_prompt
+from src.utils.prompt import fill_prompt_1a, fill_prompt_1d, fill_prompt_2a, fill_prompt_2b, load_prompt
 
 
 def _load_yaml(path: str) -> dict:
@@ -366,6 +366,170 @@ def run_1d(
     _save_json(metadata, os.path.join(exp_dir, "run_metadata.json"))
 
     print(f"\nDone in {total_runtime}s. Output saved to {output_path}")
+
+
+def run_2a(
+    config: dict,
+    drive_root: str,
+    hf_token: str,
+    repo_root: str = ".",
+    force: bool = False,
+    dry_run: bool = False,
+) -> None:
+    """Run Prompt 2a to extract loss-of-control scenarios from each paper.
+
+    Structurally identical to run_1a. Differences:
+      - Loads the operational definition from verified/definition.txt
+      - Uses fill_prompt_2a instead of fill_prompt_1a
+      - Outputs to stages/2a_scenario_extraction/
+      - Output schema has scenarios_found
+    """
+    run_start = time.time()
+    timestamp = datetime.now(timezone.utc).isoformat()
+
+    # --- Load configs ---
+    papers_path = os.path.join(repo_root, "papers.yaml")
+    papers_config = _load_yaml(papers_path)["papers"]
+
+    prompt_path = os.path.join(repo_root, "prompts", f"{config['prompt_version']}.txt")
+    template = load_prompt(prompt_path)
+
+    # --- Load the operational definition ---
+    definition_path = os.path.join(
+        drive_root, "stages", "1d_definition_synthesis",
+        "verified", "definition.txt",
+    )
+    if not os.path.exists(definition_path):
+        raise FileNotFoundError(
+            f"Operational definition not found: {definition_path}\n"
+            "This file should contain the verified definition from Task 1D."
+        )
+    with open(definition_path, "r", encoding="utf-8") as f:
+        definition = f.read().strip()
+
+    # --- Set up experiment directory ---
+    exp_dir = os.path.join(
+        drive_root, "stages", "2a_scenario_extraction",
+        "experiments", config["experiment"],
+    )
+    outputs_dir = os.path.join(exp_dir, "outputs")
+    logs_dir = os.path.join(exp_dir, "logs")
+    os.makedirs(outputs_dir, exist_ok=True)
+    os.makedirs(logs_dir, exist_ok=True)
+
+    # --- Process each paper ---
+    total = len(papers_config)
+    per_paper_meta = []
+    errors = []
+
+    for i, paper in enumerate(papers_config, 1):
+        paper_id = paper["id"]
+        output_path = os.path.join(outputs_dir, f"{paper_id}.json")
+
+        if os.path.exists(output_path) and not force:
+            print(f"  [{i}/{total}] SKIP {paper_id} — output already exists")
+            per_paper_meta.append({"paper_id": paper_id, "skipped": True})
+            continue
+
+        print(f"  [{i}/{total}] Processing {paper_id}...")
+
+        raw_text_path = os.path.join(drive_root, "raw_text", f"{paper_id}.txt")
+        if not os.path.exists(raw_text_path):
+            msg = f"Raw text not found: {raw_text_path}"
+            print(f"  [{i}/{total}] ERROR {paper_id} — {msg}")
+            errors.append({"paper_id": paper_id, "error": msg})
+            per_paper_meta.append({"paper_id": paper_id, "skipped": False, "error": msg})
+            continue
+
+        with open(raw_text_path, "r", encoding="utf-8") as f:
+            paper_text = f.read()
+
+        filled_prompt = fill_prompt_2a(template, definition, paper_text)
+
+        paper_start = time.time()
+        try:
+            result = query_llm(
+                prompt=filled_prompt,
+                model=config["model"],
+                hf_token=hf_token,
+                temperature=config.get("temperature", 0.1),
+                provider=config.get("provider", "nscale"),
+                dry_run=dry_run,
+            )
+        except Exception as e:
+            paper_latency = round(time.time() - paper_start, 2)
+            msg = f"API error: {e}"
+            print(f"  [{i}/{total}] ERROR {paper_id} — {msg}")
+            errors.append({"paper_id": paper_id, "error": msg})
+            per_paper_meta.append({
+                "paper_id": paper_id, "skipped": False,
+                "error": msg, "latency_seconds": paper_latency,
+            })
+            continue
+        paper_latency = round(time.time() - paper_start, 2)
+
+        generated_text = result["generated_text"]
+        _save_json(result.get("raw_response", {}), os.path.join(logs_dir, f"{paper_id}_raw.json"))
+
+        parsed = _parse_json_response(generated_text)
+        if parsed is None:
+            msg = "Failed to parse JSON from model response"
+            print(f"  [{i}/{total}] WARN {paper_id} — {msg}. Raw response saved to logs.")
+            _save_json({"raw_text": generated_text, "parse_error": True}, output_path)
+            errors.append({"paper_id": paper_id, "error": msg})
+            per_paper_meta.append({
+                "paper_id": paper_id, "skipped": False,
+                "error": msg, "latency_seconds": paper_latency,
+                "usage": result.get("usage"),
+            })
+            continue
+
+        # The model may return a single object or a list. Normalize to a dict
+        # with a scenarios_found key for consistency.
+        if isinstance(parsed, list):
+            parsed = {"paper_id": paper_id, "scenarios_found": parsed}
+        elif "scenarios_found" not in parsed:
+            # Model returned a single scenario object or unexpected shape — wrap it
+            parsed = {"paper_id": paper_id, "scenarios_found": [parsed] if "scenario_id" in parsed else []}
+
+        _save_json(parsed, output_path)
+
+        num_scenarios = len(parsed.get("scenarios_found", []))
+        print(f"  [{i}/{total}] OK {paper_id} — {num_scenarios} scenarios, {paper_latency}s")
+
+        per_paper_meta.append({
+            "paper_id": paper_id,
+            "skipped": False,
+            "scenarios_found": num_scenarios,
+            "latency_seconds": paper_latency,
+            "usage": result.get("usage"),
+        })
+
+    # --- Save config snapshot ---
+    config_snapshot = {
+        **config,
+        "definition": definition,
+        "dry_run": dry_run,
+        "force": force,
+    }
+    _save_json(config_snapshot, os.path.join(exp_dir, "config.json"))
+
+    # --- Save run metadata ---
+    total_runtime = round(time.time() - run_start, 2)
+    metadata = {
+        "timestamp": timestamp,
+        "total_runtime_seconds": total_runtime,
+        "total_papers": total,
+        "papers_processed": sum(1 for m in per_paper_meta if not m.get("skipped")),
+        "papers_skipped": sum(1 for m in per_paper_meta if m.get("skipped")),
+        "errors": errors,
+        "per_paper": per_paper_meta,
+    }
+    _save_json(metadata, os.path.join(exp_dir, "run_metadata.json"))
+
+    print(f"\nDone. {metadata['papers_processed']}/{total} papers processed in {total_runtime}s.")
+    if errors:
+        print(f"  {len(errors)} error(s) — see run_metadata.json for details.")
 
 
 if __name__ == "__main__":
