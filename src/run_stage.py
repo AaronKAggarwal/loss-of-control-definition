@@ -532,6 +532,159 @@ def run_2a(
         print(f"  {len(errors)} error(s) — see run_metadata.json for details.")
 
 
+def run_2b(
+    config: dict,
+    drive_root: str,
+    hf_token: str,
+    repo_root: str = ".",
+    force: bool = False,
+    dry_run: bool = False,
+) -> None:
+    """Run Prompt 2b to identify variables and causal relationships per scenario.
+
+    Different iteration pattern: one LLM call per scenario (not per paper).
+    Reads verified scenarios from consolidated_verified.json, which contains
+    a list of objects each with paper_id, scenario_id, and scenario_text.
+    """
+    run_start = time.time()
+    timestamp = datetime.now(timezone.utc).isoformat()
+
+    prompt_path = os.path.join(repo_root, "prompts", f"{config['prompt_version']}.txt")
+    template = load_prompt(prompt_path)
+
+    # --- Load verified scenarios ---
+    scenarios_path = os.path.join(
+        drive_root, "stages", "2a_scenario_extraction",
+        "verified", "consolidated_verified.json",
+    )
+    if not os.path.exists(scenarios_path):
+        raise FileNotFoundError(
+            f"Verified scenarios not found: {scenarios_path}\n"
+            "This file should contain human-reviewed scenarios from Task 2A."
+        )
+    with open(scenarios_path, "r", encoding="utf-8") as f:
+        scenarios = json.load(f)
+
+    if not scenarios:
+        raise ValueError(f"No scenarios found in {scenarios_path}")
+
+    # --- Set up experiment directory ---
+    exp_dir = os.path.join(
+        drive_root, "stages", "2b_variable_identification",
+        "experiments", config["experiment"],
+    )
+    outputs_dir = os.path.join(exp_dir, "outputs")
+    logs_dir = os.path.join(exp_dir, "logs")
+    os.makedirs(outputs_dir, exist_ok=True)
+    os.makedirs(logs_dir, exist_ok=True)
+
+    # --- Process each scenario ---
+    total = len(scenarios)
+    per_scenario_meta = []
+    errors = []
+
+    for i, scenario in enumerate(scenarios, 1):
+        paper_id = scenario["paper_id"]
+        scenario_id = scenario["scenario_id"]
+        scenario_text = scenario["scenario_text"]
+        item_key = f"{paper_id}_{scenario_id}"
+
+        output_path = os.path.join(outputs_dir, f"{item_key}.json")
+
+        if os.path.exists(output_path) and not force:
+            print(f"  [{i}/{total}] SKIP {item_key} — output already exists")
+            per_scenario_meta.append({"item_key": item_key, "skipped": True})
+            continue
+
+        print(f"  [{i}/{total}] Processing {item_key}...")
+
+        filled_prompt = fill_prompt_2b(template, scenario_text)
+
+        scenario_start = time.time()
+        try:
+            result = query_llm(
+                prompt=filled_prompt,
+                model=config["model"],
+                hf_token=hf_token,
+                temperature=config.get("temperature", 0.1),
+                provider=config.get("provider", "nscale"),
+                dry_run=dry_run,
+            )
+        except Exception as e:
+            scenario_latency = round(time.time() - scenario_start, 2)
+            msg = f"API error: {e}"
+            print(f"  [{i}/{total}] ERROR {item_key} — {msg}")
+            errors.append({"item_key": item_key, "error": msg})
+            per_scenario_meta.append({
+                "item_key": item_key, "skipped": False,
+                "error": msg, "latency_seconds": scenario_latency,
+            })
+            continue
+        scenario_latency = round(time.time() - scenario_start, 2)
+
+        generated_text = result["generated_text"]
+        _save_json(result.get("raw_response", {}), os.path.join(logs_dir, f"{item_key}_raw.json"))
+
+        parsed = _parse_json_response(generated_text)
+        if parsed is None:
+            msg = "Failed to parse JSON from model response"
+            print(f"  [{i}/{total}] WARN {item_key} — {msg}. Raw response saved to logs.")
+            _save_json({"raw_text": generated_text, "parse_error": True}, output_path)
+            errors.append({"item_key": item_key, "error": msg})
+            per_scenario_meta.append({
+                "item_key": item_key, "skipped": False,
+                "error": msg, "latency_seconds": scenario_latency,
+                "usage": result.get("usage"),
+            })
+            continue
+
+        # Ensure paper_id and scenario_id are on the output
+        parsed["paper_id"] = paper_id
+        parsed["scenario_id"] = scenario_id
+        _save_json(parsed, output_path)
+
+        num_vars = len(parsed.get("variables", []))
+        num_rels = len(parsed.get("causal_relationships", []))
+        print(f"  [{i}/{total}] OK {item_key} — {num_vars} variables, {num_rels} relationships, {scenario_latency}s")
+
+        per_scenario_meta.append({
+            "item_key": item_key,
+            "skipped": False,
+            "variables_found": num_vars,
+            "relationships_found": num_rels,
+            "latency_seconds": scenario_latency,
+            "usage": result.get("usage"),
+        })
+
+    # --- Save config snapshot ---
+    config_snapshot = {
+        **config,
+        "dry_run": dry_run,
+        "force": force,
+        "total_scenarios": total,
+    }
+    _save_json(config_snapshot, os.path.join(exp_dir, "config.json"))
+
+    # --- Save run metadata ---
+    total_runtime = round(time.time() - run_start, 2)
+    processed = sum(1 for m in per_scenario_meta if not m.get("skipped"))
+    skipped = sum(1 for m in per_scenario_meta if m.get("skipped"))
+    metadata = {
+        "timestamp": timestamp,
+        "total_runtime_seconds": total_runtime,
+        "total_scenarios": total,
+        "scenarios_processed": processed,
+        "scenarios_skipped": skipped,
+        "errors": errors,
+        "per_scenario": per_scenario_meta,
+    }
+    _save_json(metadata, os.path.join(exp_dir, "run_metadata.json"))
+
+    print(f"\nDone. {processed}/{total} scenarios processed in {total_runtime}s.")
+    if errors:
+        print(f"  {len(errors)} error(s) — see run_metadata.json for details.")
+
+
 if __name__ == "__main__":
     import sys
     import tempfile
