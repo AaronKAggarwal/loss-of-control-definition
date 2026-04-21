@@ -1,0 +1,97 @@
+You are given a scenario passage extracted from academic
+literature. Your task is to identify and extract variables from
+the text.
+
+A variable is defined as a noun or noun phrase that represents
+a real quantity, condition, or state in the system that can vary
+in magnitude, level, or degree. Variables must be grounded in
+the text and reflect components of the system described in the
+scenario.
+
+Variables must follow these rules:
+
+- Variables must be written as nouns or noun phrases. Do not use
+  verbs or full sentences.
+- Variables must have a neutral sense of direction. Do not
+  include directional words such as "increase," "decrease,"
+  "reduction," "improvement," "decline," or "change in." For
+  example, write "system capability" instead of "increase in
+  system capability."
+- Variables should represent something that could be measured,
+  counted, or meaningfully compared in terms of more or less.
+  Avoid vague or ambiguous terms that do not clearly vary. For
+  example, prefer "user trust" over "user experience."
+- Variables must reflect actual components described in the
+  text. Do not invent variables that are not explicitly grounded
+  in the passage.
+- If the text refers to perceptions or subjective evaluations,
+  distinguish them clearly from objective system components. For
+  example, "model performance" is different from "perceived
+  model performance."
+- If the text refers to goals, targets, or desired states,
+  distinguish them from current states. For example, "target
+  system performance" is different from "actual system
+  performance."
+- Avoid combining multiple concepts into one variable. Each
+  variable should represent a single concept.
+- If a phrase includes directional meaning, rewrite it into a
+  neutral variable form. For example:
+  "reduction in oversight" → "level of oversight"
+  "increasing autonomy" → "system autonomy"
+
+You must follow a strict no-inference rule. Only extract
+variables that are explicitly present or directly grounded in
+the text. Do not infer hidden variables or introduce new
+concepts.
+
+After identifying variables, extract any explicitly stated
+causal relationships between them. A causal relationship is a
+directional link where a change in one variable produces a
+change in another. Only include relationships that are clearly
+stated in the text.
+
+For each causal relationship, identify polarity:
+- Positive (+): both variables change in the same direction
+- Negative (−): variables change in opposite directions
+If polarity is not explicitly clear from the text, write
+"Not specified".
+
+Return output in strict JSON format as follows:
+{
+  "scenario_id": "",
+  "variables": [
+    {
+      "variable_name": "",
+      "text_evidence": "",
+      "notes": ""
+    }
+  ],
+  "causal_relationships": [
+    {
+      "from_variable": "",
+      "to_variable": "",
+      "relationship_text": "",
+      "polarity": ""
+    }
+  ]
+}
+
+scenario_id: copy from the input.
+variable_name: cleaned noun or noun phrase following all rules
+  above.
+text_evidence: exact phrase from the text that supports the
+  variable.
+notes: briefly explain any transformation (for example,
+  removing directional wording or distinguishing perception
+  vs actual).
+from_variable and to_variable: must match variable names
+  exactly from the variables list.
+relationship_text: exact verbatim text describing the causal
+  link.
+polarity: "+", "-", or "Not specified".
+
+Extract all valid variables and relationships grounded in the
+text. Be strict about text grounding and avoid inference.
+
+SCENARIO PASSAGE:
+[INSERT SCENARIO TEXT HERE]

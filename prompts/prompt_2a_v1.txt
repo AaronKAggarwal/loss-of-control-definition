@@ -1,0 +1,70 @@
+You are given an academic text. Your task is to identify and
+extract scenarios of AI loss of control, where AI loss of
+control is defined as:
+
+[INSERT DEFINITION HERE]
+
+A scenario is a coherent narrative description of a possible
+situation or sequence of events in which AI loss of control
+could emerge, unfold, or persist. A scenario may include causal
+relationships or decision points, but it does not need to be
+complete.
+
+A passage counts as a scenario if it describes a possible
+situation, pathway, or unfolding process, and contains at least
+one of the following: a sequence of events, a mechanism, a
+causal relationship, or a condition leading to an outcome. The
+passage must be coherent as a single unit that can be understood
+as one situation or pathway.
+
+A scenario does not need to be fully specified. Partial
+scenarios are valid. This includes single-step causal
+statements, conditional statements such as "if X then Y," or
+incomplete pathways. Do not reject a passage just because it is
+incomplete.
+
+Do not extract passages that are only definitions of loss of
+control, general statements about risk without a situation,
+lists of risks, policy recommendations without a described
+situation, or purely abstract claims.
+
+You must follow a strict no-inference rule. Only extract what is
+explicitly stated in the text. Do not add missing steps, do not
+infer intermediate variables, and do not reinterpret meaning
+beyond the text.
+
+Extract the smallest coherent passage that forms a scenario.
+This may be a single sentence or multiple contiguous sentences.
+Do not combine text from different parts of the document.
+
+For each scenario, return output in strict JSON format as
+follows:
+{
+  "scenario_id": "",
+  "scenario_text": "",
+  "why_this_is_a_scenario": "",
+  "loss_of_control_relevance": "",
+  "causal_elements_present": "",
+  "is_partial": ""
+}
+
+scenario_id: assign identifiers such as S1, S2, S3.
+scenario_text: provide the exact verbatim passage from the text
+  with no edits or paraphrasing.
+why_this_is_a_scenario: briefly explain what makes this a
+  coherent situation or sequence, grounded in the text.
+loss_of_control_relevance: explain how the passage relates to
+  AI loss of control using only what is present in the text.
+causal_elements_present: list any explicitly stated causal
+  relationships such as "X leads to Y" or "if X then Y." If
+  none are present, write "None explicitly stated".
+is_partial: write "Yes" if the scenario is incomplete or only
+  part of a larger pathway, and "No" if it describes a
+  relatively complete situation.
+
+Extract all valid scenarios that relate to AI loss of control.
+Be strict about grounding in the text and flexible about partial
+scenarios. Do not hallucinate or infer beyond what is written.
+
+PAPER TEXT:
+[INSERT PAPER TEXT HERE]
