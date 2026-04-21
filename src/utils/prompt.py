@@ -18,6 +18,11 @@ PLACEHOLDER_1A_PAPER_TEXT = "[INSERT PAPER TEXT HERE]"
 PLACEHOLDER_1B_DEFINITIONS = "[INSERT ALL COMPILED DEFINITIONS FROM PROMPT 1a HERE]"
 PLACEHOLDER_1D_ATTRIBUTES = "[INSERT HUMAN-VERIFIED ATTRIBUTES FROM PHASE 3 HERE]"
 
+# Stage 2 placeholders
+PLACEHOLDER_2A_DEFINITION = "[INSERT DEFINITION HERE]"
+PLACEHOLDER_2A_PAPER_TEXT = "[INSERT PAPER TEXT HERE]"  # same text as 1a but different constant for clarity
+PLACEHOLDER_2B_SCENARIO_TEXT = "[INSERT SCENARIO TEXT HERE]"
+
 
 def load_prompt(prompt_path: str) -> str:
     """Load prompt template from file."""
@@ -81,6 +86,18 @@ def fill_prompt_1d(template: str, verified_attributes_json: str) -> str:
     return _replace_placeholder(template, PLACEHOLDER_1D_ATTRIBUTES, verified_attributes_json, "verified attributes")
 
 
+def fill_prompt_2a(template: str, definition: str, paper_text: str) -> str:
+    """Replace definition and paper text placeholders for scenario extraction."""
+    result = _replace_placeholder(template, PLACEHOLDER_2A_DEFINITION, definition, "definition")
+    result = _replace_placeholder(result, PLACEHOLDER_2A_PAPER_TEXT, paper_text, "paper text")
+    return result
+
+
+def fill_prompt_2b(template: str, scenario_text: str) -> str:
+    """Replace scenario text placeholder for variable identification."""
+    return _replace_placeholder(template, PLACEHOLDER_2B_SCENARIO_TEXT, scenario_text, "scenario text")
+
+
 if __name__ == "__main__":
     import os
 
@@ -128,6 +145,30 @@ if __name__ == "__main__":
     print("\n--- V2 first 15 lines ---")
     print("\n".join(lines_v2[:15]))
 
+    # --- Test 2a ---
+    print("\n=== 2A TEST ===\n")
+    template_2a = load_prompt(os.path.join(prompts_dir, "prompt_2a_v1.txt"))
+    dummy_def = "Loss of control occurs when humans can no longer direct an AI system."
+
+    filled_2a = fill_prompt_2a(template_2a, dummy_def, dummy_text)
+
+    assert PLACEHOLDER_2A_DEFINITION not in filled_2a, "Definition placeholder NOT replaced!"
+    assert PLACEHOLDER_2A_PAPER_TEXT not in filled_2a, "Paper text placeholder NOT replaced!"
+    assert dummy_def in filled_2a
+    assert dummy_text in filled_2a
+    print(f"2a filled: {len(filled_2a)} chars, definition and paper text inserted")
+
+    # --- Test 2b ---
+    print("\n=== 2B TEST ===\n")
+    template_2b = load_prompt(os.path.join(prompts_dir, "prompt_2b_v1.txt"))
+    dummy_scenario = "If an AI system acquires resources beyond its operators' intent, it may resist shutdown."
+
+    filled_2b = fill_prompt_2b(template_2b, dummy_scenario)
+
+    assert PLACEHOLDER_2B_SCENARIO_TEXT not in filled_2b, "Scenario text placeholder NOT replaced!"
+    assert dummy_scenario in filled_2b
+    print(f"2b filled: {len(filled_2b)} chars, scenario text inserted")
+
     # --- Test double-fill raises ---
     try:
         fill_prompt_1a(filled_v1, dummy_terms_v1, dummy_text)
@@ -135,4 +176,4 @@ if __name__ == "__main__":
     except ValueError as e:
         print(f"\n[OK] Double-fill correctly raised ValueError")
 
-    print("\n[OK] All prompt.py tests passed (v1 + v2).")
+    print("\n[OK] All prompt.py tests passed (v1 + v2 + 2a + 2b).")
