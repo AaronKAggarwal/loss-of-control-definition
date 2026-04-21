@@ -264,6 +264,315 @@ def generate_review_docs(
     print(f"  consolidated.json written ({len(all_extractions)} extractions)")
 
 
+# ---------------------------------------------------------------------------
+# Stage 2a: Scenario Extraction review docs
+# ---------------------------------------------------------------------------
+
+def _generate_review_md_2a(
+    paper_id: str,
+    citation: str,
+    output: dict,
+    raw_text: str,
+    config: dict,
+    run_date: str,
+) -> str:
+    """Generate a review markdown doc for 2a scenario extraction output."""
+    lines = []
+    lines.append(f"# Scenario Extraction Review: {paper_id}")
+    lines.append("")
+    lines.append(f"**Paper:** {citation}")
+    lines.append(f"**Experiment:** {config.get('experiment', 'unknown')}")
+    lines.append(f"**Model:** {config.get('model', 'unknown')}")
+    lines.append(f"**Date:** {run_date}")
+    lines.append("")
+    lines.append("---")
+
+    scenarios = output.get("scenarios_found", [])
+
+    if not scenarios:
+        lines.append("")
+        lines.append("*No scenarios found in this paper.*")
+        return "\n".join(lines)
+
+    for scenario in scenarios:
+        sid = scenario.get("scenario_id", "?")
+        scenario_text = scenario.get("scenario_text", "")
+
+        verification = verify_quote(scenario_text, raw_text)
+        if verification["found"]:
+            verify_str = f"VERIFIED (ratio: {verification['match_ratio']:.2f})"
+        else:
+            verify_str = (
+                f"UNVERIFIED — quote not found in source "
+                f"(best ratio: {verification['match_ratio']:.2f})"
+            )
+        context_str = verification["best_match_context"] if verification["found"] else "*No matching context found.*"
+
+        lines.append("")
+        lines.append(f"## Scenario {sid}")
+        lines.append("")
+        lines.append("**Extracted scenario:**")
+        lines.append(f"> {scenario_text}")
+        lines.append("")
+        lines.append("**Context from source** (\u00b13 sentences):")
+        lines.append(f"> {context_str}")
+        lines.append("")
+        lines.append(f"**Quote verification:** {verify_str}")
+        lines.append("")
+        lines.append(f"**Why this is a scenario:** {scenario.get('why_this_is_a_scenario', '')}")
+        lines.append(f"**Loss of control relevance:** {scenario.get('loss_of_control_relevance', '')}")
+        lines.append(f"**Causal elements:** {scenario.get('causal_elements_present', '')}")
+        lines.append(f"**Partial:** {scenario.get('is_partial', '')}")
+        lines.append("")
+        lines.append("**Reviewer decision:** [ ] Accept  [ ] Reject  [ ] Needs discussion")
+        lines.append("")
+        lines.append("**Reviewer notes:**")
+        lines.append("")
+        lines.append("---")
+
+    return "\n".join(lines)
+
+
+def generate_review_docs_2a(
+    config: dict,
+    drive_root: str,
+    repo_root: str = ".",
+) -> None:
+    """Generate review docs, summary CSV, and consolidated JSON for a 2a experiment."""
+    experiment = config["experiment"]
+    exp_dir = os.path.join(
+        drive_root, "stages", "2a_scenario_extraction",
+        "experiments", experiment,
+    )
+    outputs_dir = os.path.join(exp_dir, "outputs")
+    review_dir = os.path.join(exp_dir, "review")
+    os.makedirs(review_dir, exist_ok=True)
+
+    config_path = os.path.join(exp_dir, "config.json")
+    exp_config = _load_json(config_path) if os.path.exists(config_path) else config
+
+    meta_path = os.path.join(exp_dir, "run_metadata.json")
+    run_date = _load_json(meta_path).get("timestamp", "unknown") if os.path.exists(meta_path) else "unknown"
+
+    paper_lookup = _build_paper_lookup(repo_root)
+
+    if not os.path.exists(outputs_dir):
+        print("No outputs directory found. Run run_2a first.")
+        return
+
+    output_files = sorted(f for f in os.listdir(outputs_dir) if f.endswith(".json"))
+    if not output_files:
+        print("No output files found. Run run_2a first.")
+        return
+
+    summary_rows = []
+    all_scenarios = []
+
+    for filename in output_files:
+        paper_id = filename.replace(".json", "")
+        output_path = os.path.join(outputs_dir, filename)
+        output = _load_json(output_path)
+
+        if output.get("parse_error"):
+            print(f"  [SKIP] {paper_id} — parse error in output")
+            continue
+
+        citation = paper_lookup.get(paper_id, paper_id)
+
+        raw_text_path = os.path.join(drive_root, "raw_text", f"{paper_id}.txt")
+        if os.path.exists(raw_text_path):
+            with open(raw_text_path, "r", encoding="utf-8") as f:
+                raw_text = f.read()
+        else:
+            raw_text = ""
+            print(f"  [WARN] {paper_id} — raw text not found")
+
+        review_md = _generate_review_md_2a(paper_id, citation, output, raw_text, exp_config, run_date)
+        with open(os.path.join(review_dir, f"{paper_id}.md"), "w", encoding="utf-8") as f:
+            f.write(review_md)
+
+        scenarios = output.get("scenarios_found", [])
+        num_scenarios = len(scenarios)
+
+        num_verified = 0
+        num_unverified = 0
+        num_partial = 0
+        for s in scenarios:
+            v = verify_quote(s.get("scenario_text", ""), raw_text)
+            if v["found"]:
+                num_verified += 1
+            else:
+                num_unverified += 1
+            if str(s.get("is_partial", "")).lower() == "yes":
+                num_partial += 1
+
+        summary_rows.append({
+            "paper_id": paper_id,
+            "citation": citation,
+            "num_scenarios": num_scenarios,
+            "num_verified_quotes": num_verified,
+            "num_unverified_quotes": num_unverified,
+            "num_partial": num_partial,
+        })
+
+        for s in scenarios:
+            all_scenarios.append({"paper_id": paper_id, **s})
+
+        print(f"  [OK] {paper_id} — review doc generated ({num_scenarios} scenarios)")
+
+    # Write summary.csv
+    summary_path = os.path.join(exp_dir, "summary.csv")
+    if summary_rows:
+        fieldnames = list(summary_rows[0].keys())
+        with open(summary_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(summary_rows)
+        print(f"\n  summary.csv written ({len(summary_rows)} rows)")
+
+    consolidated_path = os.path.join(exp_dir, "consolidated.json")
+    _save_json(all_scenarios, consolidated_path)
+    print(f"  consolidated.json written ({len(all_scenarios)} scenarios)")
+
+
+# ---------------------------------------------------------------------------
+# Stage 2b: Variable Identification review docs
+# ---------------------------------------------------------------------------
+
+def _generate_review_md_2b(scenario_data: dict, scenario_text: str) -> str:
+    """Generate a review markdown doc for a single 2b variable identification output."""
+    paper_id = scenario_data.get("paper_id", "?")
+    scenario_id = scenario_data.get("scenario_id", "?")
+
+    lines = []
+    lines.append(f"# Variable Identification Review: {paper_id} — {scenario_id}")
+    lines.append("")
+    lines.append("**Scenario text:**")
+    lines.append(f"> {scenario_text}")
+    lines.append("")
+    lines.append("---")
+
+    # Variables table
+    variables = scenario_data.get("variables", [])
+    lines.append("")
+    lines.append("## Variables")
+    lines.append("")
+    lines.append("| # | Variable | Text Evidence | Notes |")
+    lines.append("|---|----------|--------------|-------|")
+    for j, var in enumerate(variables, 1):
+        name = var.get("variable_name", "")
+        evidence = var.get("text_evidence", "")
+        notes = var.get("notes", "")
+        lines.append(f"| {j} | {name} | {evidence} | {notes} |")
+
+    # Causal relationships table
+    rels = scenario_data.get("causal_relationships", [])
+    lines.append("")
+    lines.append("## Causal Relationships")
+    lines.append("")
+    lines.append("| # | From | To | Relationship Text | Polarity |")
+    lines.append("|---|------|----|------------------|----------|")
+    for j, rel in enumerate(rels, 1):
+        from_v = rel.get("from_variable", "")
+        to_v = rel.get("to_variable", "")
+        rel_text = rel.get("relationship_text", "")
+        polarity = rel.get("polarity", "")
+        lines.append(f"| {j} | {from_v} | {to_v} | {rel_text} | {polarity} |")
+
+    lines.append("")
+    lines.append("**Reviewer decision:** [ ] Accept  [ ] Reject  [ ] Needs discussion")
+    lines.append("")
+    lines.append("**Reviewer notes:**")
+    lines.append("")
+    lines.append("---")
+
+    return "\n".join(lines)
+
+
+def generate_review_docs_2b(
+    config: dict,
+    drive_root: str,
+    repo_root: str = ".",
+) -> None:
+    """Generate review docs, summary CSV, and consolidated JSON for a 2b experiment."""
+    experiment = config["experiment"]
+    exp_dir = os.path.join(
+        drive_root, "stages", "2b_variable_identification",
+        "experiments", experiment,
+    )
+    outputs_dir = os.path.join(exp_dir, "outputs")
+    review_dir = os.path.join(exp_dir, "review")
+    os.makedirs(review_dir, exist_ok=True)
+
+    if not os.path.exists(outputs_dir):
+        print("No outputs directory found. Run run_2b first.")
+        return
+
+    output_files = sorted(f for f in os.listdir(outputs_dir) if f.endswith(".json"))
+    if not output_files:
+        print("No output files found. Run run_2b first.")
+        return
+
+    # Load the verified scenarios to get scenario_text for each
+    scenarios_path = os.path.join(
+        drive_root, "stages", "2a_scenario_extraction",
+        "verified", "consolidated_verified.json",
+    )
+    scenario_text_lookup = {}
+    if os.path.exists(scenarios_path):
+        with open(scenarios_path, "r", encoding="utf-8") as f:
+            for s in json.load(f):
+                key = f"{s['paper_id']}_{s['scenario_id']}"
+                scenario_text_lookup[key] = s.get("scenario_text", "")
+
+    summary_rows = []
+    all_outputs = []
+
+    for filename in output_files:
+        item_key = filename.replace(".json", "")
+        output_path = os.path.join(outputs_dir, filename)
+        data = _load_json(output_path)
+
+        if data.get("parse_error"):
+            print(f"  [SKIP] {item_key} — parse error in output")
+            continue
+
+        scenario_text = scenario_text_lookup.get(item_key, "")
+
+        review_md = _generate_review_md_2b(data, scenario_text)
+        with open(os.path.join(review_dir, f"{item_key}.md"), "w", encoding="utf-8") as f:
+            f.write(review_md)
+
+        paper_id = data.get("paper_id", item_key.rsplit("_", 1)[0])
+        scenario_id = data.get("scenario_id", item_key.rsplit("_", 1)[-1])
+        num_vars = len(data.get("variables", []))
+        num_rels = len(data.get("causal_relationships", []))
+
+        summary_rows.append({
+            "paper_id": paper_id,
+            "scenario_id": scenario_id,
+            "num_variables": num_vars,
+            "num_causal_relationships": num_rels,
+        })
+
+        all_outputs.append(data)
+        print(f"  [OK] {item_key} — review doc generated ({num_vars} vars, {num_rels} rels)")
+
+    # Write summary.csv
+    summary_path = os.path.join(exp_dir, "summary.csv")
+    if summary_rows:
+        fieldnames = list(summary_rows[0].keys())
+        with open(summary_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(summary_rows)
+        print(f"\n  summary.csv written ({len(summary_rows)} rows)")
+
+    consolidated_path = os.path.join(exp_dir, "consolidated.json")
+    _save_json(all_outputs, consolidated_path)
+    print(f"  consolidated.json written ({len(all_outputs)} entries)")
+
+
 if __name__ == "__main__":
     import tempfile
 
