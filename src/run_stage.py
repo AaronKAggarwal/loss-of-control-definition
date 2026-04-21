@@ -152,6 +152,7 @@ def run_1a(
                 model=config["model"],
                 hf_token=hf_token,
                 temperature=config.get("temperature", 0.1),
+                max_new_tokens=config.get("max_new_tokens", 8192),
                 provider=config.get("provider", "nscale"),
                 dry_run=dry_run,
             )
@@ -316,6 +317,7 @@ def run_1d(
             model=config["model"],
             hf_token=hf_token,
             temperature=config.get("temperature", 0.1),
+            max_new_tokens=config.get("max_new_tokens", 8192),
             provider=config.get("provider", "nscale"),
             dry_run=dry_run,
         )
@@ -463,6 +465,7 @@ def run_2a(
                 model=config["model"],
                 hf_token=hf_token,
                 temperature=config.get("temperature", 0.1),
+                max_new_tokens=config.get("max_new_tokens", 8192),
                 provider=config.get("provider", "nscale"),
                 dry_run=dry_run,
             )
@@ -617,6 +620,7 @@ def run_2b(
                 model=config["model"],
                 hf_token=hf_token,
                 temperature=config.get("temperature", 0.1),
+                max_new_tokens=config.get("max_new_tokens", 8192),
                 provider=config.get("provider", "nscale"),
                 dry_run=dry_run,
             )
