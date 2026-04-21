@@ -82,12 +82,37 @@ def query_llm(
     for attempt in range(max_retries):
         start = time.time()
         try:
-            response = client.chat.completions.create(
+            # Use streaming to avoid gateway timeouts on long-running
+            # inference (e.g. Kimi K2.5 reasoning model). Streaming keeps
+            # the connection alive by sending chunks as they're generated.
+            stream = client.chat.completions.create(
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=max_new_tokens,
                 temperature=temperature,
+                stream=True,
             )
+
+            # Accumulate content from streamed chunks
+            generated_text = ""
+            usage_data = None
+            chunk_count = 0
+            for chunk in stream:
+                chunk_count += 1
+                # Print a dot every 20 chunks so long runs don't look frozen
+                if chunk_count % 20 == 0:
+                    print(".", end="", flush=True)
+
+                if chunk.choices and chunk.choices[0].delta.content:
+                    generated_text += chunk.choices[0].delta.content
+
+                # Some providers send usage on the final chunk
+                if hasattr(chunk, "usage") and chunk.usage is not None:
+                    usage_data = chunk.usage
+
             latency = time.time() - start
+            # Newline after progress dots
+            if chunk_count >= 20:
+                print()
             break
         except Exception as e:
             latency = time.time() - start
@@ -105,33 +130,30 @@ def query_llm(
             print(f"  [ERROR] {error_str[:300]}")
             raise
 
-    # Extract generated text from OpenAI-compatible response
-    try:
-        generated_text = response.choices[0].message.content
-    except (AttributeError, IndexError, TypeError):
-        generated_text = str(response)
-
     result = {
         "generated_text": generated_text,
         "latency_seconds": round(latency, 2),
     }
 
     if return_full_response:
-        # Serialize the response object for logging
-        try:
-            raw = json.loads(response.to_json())
-        except (AttributeError, TypeError, json.JSONDecodeError):
-            raw = str(response)
-        result["raw_response"] = raw
+        # In streaming mode we don't have a single response object to serialize,
+        # so log what we have: the generated text length and chunk count
+        result["raw_response"] = {
+            "streaming": True,
+            "chunk_count": chunk_count,
+            "generated_text_length": len(generated_text),
+        }
 
-    # Extract usage if available
-    try:
-        usage = response.usage
-        result["usage"] = {
-            "prompt_tokens": usage.prompt_tokens,
-            "completion_tokens": usage.completion_tokens,
-        } if usage else None
-    except AttributeError:
+    # Extract usage if the final chunk included it
+    if usage_data is not None:
+        try:
+            result["usage"] = {
+                "prompt_tokens": usage_data.prompt_tokens,
+                "completion_tokens": usage_data.completion_tokens,
+            }
+        except AttributeError:
+            result["usage"] = None
+    else:
         result["usage"] = None
 
     return result
