@@ -34,6 +34,16 @@ def _parse_json_response(text: str) -> dict | None:
          JSON in markdown fences or added preamble text).
       3. Return None if both fail — caller should log the raw response.
     """
+    # Strip markdown fences — common with Kimi K2.5 via Together
+    text = text.strip()
+    if text.startswith("```json"):
+        text = text[7:]
+    if text.startswith("```"):
+        text = text[3:]
+    if text.endswith("```"):
+        text = text[:-3]
+    text = text.strip()
+
     # Attempt 1: direct parse
     try:
         return json.loads(text)
