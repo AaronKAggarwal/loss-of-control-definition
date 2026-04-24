@@ -98,6 +98,15 @@ def fill_prompt_2b(template: str, scenario_text: str) -> str:
     return _replace_placeholder(template, PLACEHOLDER_2B_SCENARIO_TEXT, scenario_text, "scenario text")
 
 
+def fill_prompt_2c(template: str, scenario_text: str) -> str:
+    """Replace scenario text placeholder for threat model extraction.
+
+    Uses the same placeholder as 2b ([INSERT SCENARIO TEXT HERE]) since
+    both prompts take a single scenario passage as input.
+    """
+    return _replace_placeholder(template, PLACEHOLDER_2B_SCENARIO_TEXT, scenario_text, "scenario text")
+
+
 if __name__ == "__main__":
     import os
 
