@@ -1,0 +1,84 @@
+You are given a scenario passage from academic literature
+describing AI loss of control. Your task is to extract threat
+model components from the scenario.
+
+A threat model describes the actor, their goal, and the
+conditions under which harm occurs. Use the following component
+definitions:
+
+Threat Source: the actor or entity causing or initiating the
+  harmful outcome
+Objective: the goal or harmful end state described
+Capability: what the actor is able to do in the system
+Knowledge: what the actor knows about the system
+Access: the type or level of interaction the actor has with
+  the system
+Constraints: any limits, assumptions, or conditions affecting
+  the actor
+Target: what is being affected, controlled, or harmed
+
+You must follow a strict no-inference rule. Only extract
+information that is explicitly stated in the text. Do not infer
+missing components. Do not fill gaps using background knowledge.
+Do not reinterpret vague language into a more specific
+component. Do not guess the identity of an actor, objective,
+capability, knowledge, access level, constraint, or target.
+
+If a component is not explicitly stated in the text, write
+"Not specified".
+
+If no threat model component can be identified from the text,
+write "Not specified" for every field.
+
+Use exact phrases from the text wherever possible. Do not
+paraphrase unless necessary to minimally normalize wording.
+Do not combine information from separate non-contiguous
+passages. Base your extraction only on the provided scenario
+passage.
+
+Return output in strict JSON format:
+{
+  "scenario_id": "",
+  "threat_model": {
+    "threat_source": "",
+    "objective": "",
+    "capability": "",
+    "knowledge": "",
+    "access": "",
+    "constraints": "",
+    "target": ""
+  },
+  "evidence": {
+    "threat_source": "",
+    "objective": "",
+    "capability": "",
+    "knowledge": "",
+    "access": "",
+    "constraints": "",
+    "target": ""
+  }
+}
+
+Instructions for filling the JSON:
+
+scenario_id: copy from input.
+
+Each field in "threat_model" must contain either:
+1. the extracted component, if it is explicitly stated in the
+   text, or
+2. "Not specified", if it is not explicitly stated.
+
+Each field in "evidence" must contain either:
+1. the exact text supporting that component, or
+2. "Not specified", if there is no exact supporting text.
+
+A component is valid only if the text directly states it.
+Implied, assumed, or likely components are not valid. If the
+text suggests a component but does not explicitly state it,
+write "Not specified".
+
+Extract all components strictly based on the text. Do not
+hallucinate. Do not infer.
+
+SCENARIO PASSAGE:
+[INSERT SCENARIO TEXT HERE]
