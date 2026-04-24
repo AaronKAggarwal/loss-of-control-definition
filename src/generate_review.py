@@ -573,6 +573,152 @@ def generate_review_docs_2b(
     print(f"  consolidated.json written ({len(all_outputs)} entries)")
 
 
+# ---------------------------------------------------------------------------
+# Stage 2c: Threat Model Extraction review docs
+# ---------------------------------------------------------------------------
+
+THREAT_MODEL_COMPONENTS = [
+    "threat_source", "objective", "capability",
+    "knowledge", "access", "constraints", "target",
+]
+
+# Human-readable labels for the table
+_COMPONENT_LABELS = {
+    "threat_source": "Threat Source",
+    "objective": "Objective",
+    "capability": "Capability",
+    "knowledge": "Knowledge",
+    "access": "Access",
+    "constraints": "Constraints",
+    "target": "Target",
+}
+
+
+def _generate_review_md_2c(data: dict, scenario_text: str) -> str:
+    """Generate a review markdown doc for a single 2c threat model output."""
+    paper_id = data.get("paper_id", "?")
+    scenario_id = data.get("scenario_id", "?")
+    threat_model = data.get("threat_model", {})
+    evidence = data.get("evidence", {})
+
+    lines = []
+    lines.append(f"# Threat Model Review: {paper_id} — {scenario_id}")
+    lines.append("")
+    lines.append("**Scenario text:**")
+    lines.append(f"> {scenario_text}")
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+    lines.append("## Threat Model Components")
+    lines.append("")
+    lines.append("| Component | Value | Evidence |")
+    lines.append("|-----------|-------|----------|")
+    for comp in THREAT_MODEL_COMPONENTS:
+        label = _COMPONENT_LABELS[comp]
+        value = threat_model.get(comp, "Not specified")
+        ev = evidence.get(comp, "Not specified")
+        lines.append(f"| {label} | {value} | {ev} |")
+
+    lines.append("")
+    lines.append("**Reviewer decision:** [ ] Accept  [ ] Reject  [ ] Needs discussion")
+    lines.append("")
+    lines.append("**Reviewer notes:**")
+    lines.append("")
+    lines.append("---")
+
+    return "\n".join(lines)
+
+
+def generate_review_docs_2c(
+    config: dict,
+    drive_root: str,
+    repo_root: str = ".",
+) -> None:
+    """Generate review docs, summary CSV, and consolidated JSON for a 2c experiment."""
+    experiment = config["experiment"]
+    exp_dir = os.path.join(
+        drive_root, "stages", "2c_threat_model",
+        "experiments", experiment,
+    )
+    outputs_dir = os.path.join(exp_dir, "outputs")
+    review_dir = os.path.join(exp_dir, "review")
+    os.makedirs(review_dir, exist_ok=True)
+
+    if not os.path.exists(outputs_dir):
+        print("No outputs directory found. Run run_2c first.")
+        return
+
+    output_files = sorted(f for f in os.listdir(outputs_dir) if f.endswith(".json"))
+    if not output_files:
+        print("No output files found. Run run_2c first.")
+        return
+
+    # Load verified scenarios to get scenario_text for each
+    scenarios_path = os.path.join(
+        drive_root, "stages", "2a_scenario_extraction",
+        "verified", "consolidated_verified.json",
+    )
+    scenario_text_lookup = {}
+    if os.path.exists(scenarios_path):
+        with open(scenarios_path, "r", encoding="utf-8") as f:
+            for s in json.load(f):
+                key = f"{s['paper_id']}_{s['scenario_id']}"
+                scenario_text_lookup[key] = s.get("scenario_text", "")
+
+    summary_rows = []
+    all_outputs = []
+
+    for filename in output_files:
+        item_key = filename.replace(".json", "")
+        output_path = os.path.join(outputs_dir, filename)
+        data = _load_json(output_path)
+
+        if data.get("parse_error"):
+            print(f"  [SKIP] {item_key} — parse error in output")
+            continue
+
+        scenario_text = scenario_text_lookup.get(item_key, "")
+
+        review_md = _generate_review_md_2c(data, scenario_text)
+        with open(os.path.join(review_dir, f"{item_key}.md"), "w", encoding="utf-8") as f:
+            f.write(review_md)
+
+        paper_id = data.get("paper_id", item_key.rsplit("_", 1)[0])
+        scenario_id = data.get("scenario_id", item_key.rsplit("_", 1)[-1])
+
+        # Count specified vs not-specified components
+        threat_model = data.get("threat_model", {})
+        num_specified = sum(
+            1 for comp in THREAT_MODEL_COMPONENTS
+            if threat_model.get(comp, "Not specified") != "Not specified"
+        )
+        num_not_specified = len(THREAT_MODEL_COMPONENTS) - num_specified
+
+        summary_rows.append({
+            "paper_id": paper_id,
+            "scenario_id": scenario_id,
+            "num_specified_components": num_specified,
+            "num_not_specified": num_not_specified,
+        })
+
+        all_outputs.append(data)
+        print(f"  [OK] {item_key} — review doc generated ({num_specified}/7 components specified)")
+
+    # Write summary.csv
+    summary_path = os.path.join(exp_dir, "summary.csv")
+    if summary_rows:
+        fieldnames = list(summary_rows[0].keys())
+        with open(summary_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(summary_rows)
+        print(f"\n  summary.csv written ({len(summary_rows)} rows)")
+
+    consolidated_path = os.path.join(exp_dir, "consolidated.json")
+    _save_json(all_outputs, consolidated_path)
+    print(f"  consolidated.json written ({len(all_outputs)} entries)")
+
+
 if __name__ == "__main__":
     import tempfile
 
