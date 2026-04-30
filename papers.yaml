@@ -123,3 +123,33 @@ papers:
     filename: "Dafoe 2020_AI Governance_ Opportunity and Theory of Impact.pdf"
     citation: "Dafoe, A. (2020). AI Governance: Opportunity and Theory of Impact."
     notes: ""
+    
+  - id: kokotajlo_2025
+    filename: "AI 2027.pdf"
+    citation: "Kokotajlo, D., Alexander, S., Larsen, T., Lifland, E. & Dean, R. (2025). AI 2027: A research-backed AI scenario forecast."
+    notes: ""
+
+  - id: dung_2024
+    filename: "The argument for near‑term human disempowerment through AI.pdf"
+    citation: "Dung, L. (2024). The argument for near-term human disempowerment through AI."
+    notes: ""
+
+  - id: barnett_2024
+    filename: "Misalignment_and_Catastrophe.pdf"
+    citation: "Barnett, P. & Gillen, J. (2024). Without Fundamental Advances, Misalignment and Catastrophe Are the Default Outcomes of Training Powerful AI."
+    notes: ""
+
+  - id: kalra_2025
+    filename: "Not Just Superintelligence_ The Many Other Ways We May Lose Control of AI.pdf"
+    citation: "Kalra, N. & Boudreaux, B. (2025). Not Just Superintelligence: The Many Risks of Near-Future AGI."
+    notes: ""
+
+  - id: bengio_2025
+    filename: "Can Scientist AI Offer a Safer Path.pdf"
+    citation: "Bengio, Y., Cohen, M., Fornasiere, D., Ghosn, J., Greiner, P. et al. (2025). Superintelligent Agents Pose Catastrophic Risks: Can Scientist AI Offer a Safer Path."
+    notes: ""
+
+  - id: shah_2022
+    filename: "Goal Misgeneralization.pdf"
+    citation: "Shah, R., Varma, V., Kumar, R., Phuong, M., Krakovna, V. et al. (2022). Goal Misgeneralization: Why Correct Specifications Aren't Enough For Correct Goals."
+    notes: ""
