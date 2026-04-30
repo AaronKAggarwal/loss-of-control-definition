@@ -1,0 +1,164 @@
+You are given a scenario passage from academic literature
+describing AI loss of control.
+
+Your task is to extract threat model components from the
+scenario.
+
+A threat model describes the actor or system involved, the
+harmful outcome or objective, and the conditions under which
+harm occurs.
+
+Use the following component definitions:
+
+Threat Source: the actor, system, organization, institution,
+  or process that causes, initiates, enables, or contributes
+  to the harmful outcome.
+
+Objective or Harmful Outcome: the intended goal of the threat
+  source, if a goal is explicitly stated, or the harmful end
+  state described in the scenario. If no intention is stated,
+  extract the harmful outcome only if it is explicitly
+  described.
+
+Capability: what the threat source is explicitly able to do
+  in the system. This includes stated abilities, functions,
+  actions, or operations.
+
+Knowledge: what the threat source explicitly knows about the
+  system, environment, humans, oversight process,
+  vulnerabilities, or constraints.
+
+Access: the type or level of interaction the threat source
+  explicitly has with the system, environment, infrastructure,
+  users, operators, tools, data, deployment setting, or
+  decision process. Access must describe a position or route
+  of interaction, not merely a topic or domain.
+
+Constraints or Enabling Conditions: explicit limits,
+  requirements, assumptions, or conditions that shape whether
+  the scenario can occur or how it unfolds. Include resource
+  limits, time pressure, deployment conditions, coordination
+  limits, institutional limits, oversight limits, safety
+  limits, or environmental conditions only if they are
+  explicitly stated. Do not code a general topic, domain, or
+  vague context as a constraint.
+
+Target or Asset at Risk: the system component, resource,
+  process, population, institution, human capacity, or outcome
+  that is affected, controlled, disrupted, displaced, or
+  harmed.
+
+You must follow a strict no-inference rule.
+Only extract information that is explicitly stated in the
+scenario passage.
+Do not infer missing components.
+Do not fill gaps using background knowledge.
+Do not reinterpret vague language into a more specific
+component.
+Do not guess the identity of an actor, outcome, capability,
+knowledge, access level, constraint, or target.
+If a component is not explicitly stated in the text, write
+"Not specified".
+If no threat model component can be identified from the text,
+write "Not specified" for every field.
+
+Use exact phrases from the text wherever possible.
+Do not paraphrase unless necessary to minimally normalize
+wording.
+Do not combine information from separate non-contiguous
+passages.
+Base your extraction only on the provided scenario passage.
+
+Important distinction rules:
+
+Do not treat a harmful outcome as an objective unless the text
+explicitly states that the actor intends or seeks that outcome.
+If no intention is stated, place the explicitly described harm
+under "Objective or Harmful Outcome."
+
+Do not treat a broad topic or domain as access. For example,
+"legislation," "war," "AI development," or "the economy" are
+not access by themselves. Access requires an explicit route or
+position of interaction, such as API access, deployment in a
+system, control over infrastructure, ability to influence
+users, access to data, access to evaluators, access to tools,
+or participation in a decision process.
+
+Do not treat every contextual phrase as a constraint. A
+constraint or enabling condition must shape feasibility,
+behavior, or outcome. Examples include "too quickly for humans
+to intervene," "with minimal oversight," "under competitive
+pressure," "limited resources," "during deployment," or
+"without human review."
+
+Do not require every scenario to have all components. Many
+scenarios will be incomplete. Your job is to identify which
+components are explicitly present and which are not specified.
+
+Return output in strict JSON format:
+{
+  "scenario_id": "",
+  "threat_model": {
+    "threat_source": "",
+    "objective_or_harmful_outcome": "",
+    "capability": "",
+    "knowledge": "",
+    "access": "",
+    "constraints_or_enabling_conditions": "",
+    "target_or_asset_at_risk": ""
+  },
+  "evidence": {
+    "threat_source": "",
+    "objective_or_harmful_outcome": "",
+    "capability": "",
+    "knowledge": "",
+    "access": "",
+    "constraints_or_enabling_conditions": "",
+    "target_or_asset_at_risk": ""
+  },
+  "uncertainty_flags": {
+    "threat_source": "",
+    "objective_or_harmful_outcome": "",
+    "capability": "",
+    "knowledge": "",
+    "access": "",
+    "constraints_or_enabling_conditions": "",
+    "target_or_asset_at_risk": ""
+  }
+}
+
+Instructions for filling the JSON:
+
+scenario_id: copy from input.
+
+Each field in "threat_model" must contain either:
+1. the extracted component, if it is explicitly stated in the
+   text, or
+2. "Not specified", if it is not explicitly stated.
+
+Each field in "evidence" must contain either:
+1. the exact text supporting that component, or
+2. "Not specified", if there is no exact supporting text.
+
+Each field in "uncertainty_flags" must contain either:
+1. "Clear", if the component is explicitly stated and directly
+   supported by evidence,
+2. "Ambiguous", if the text may contain the component but
+   wording is vague or indirect,
+3. "Not specified", if the component is absent.
+
+If a component is ambiguous, write "Not specified" in the
+threat_model field, include the relevant phrase in the evidence
+field if available, and write "Ambiguous" in the
+uncertainty_flags field.
+
+A component is valid only if the text directly states it.
+Implied, assumed, or likely components are not valid.
+If the text suggests a component but does not explicitly state
+it, write "Not specified".
+
+Extract all components strictly based on the scenario passage.
+Do not hallucinate. Do not infer.
+
+SCENARIO PASSAGE:
+[INSERT SCENARIO TEXT HERE]
