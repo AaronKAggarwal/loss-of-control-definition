@@ -577,13 +577,12 @@ def generate_review_docs_2b(
 # Stage 2c: Threat Model Extraction review docs
 # ---------------------------------------------------------------------------
 
-THREAT_MODEL_COMPONENTS = [
+# v1 field names and labels
+THREAT_MODEL_COMPONENTS_V1 = [
     "threat_source", "objective", "capability",
     "knowledge", "access", "constraints", "target",
 ]
-
-# Human-readable labels for the table
-_COMPONENT_LABELS = {
+_COMPONENT_LABELS_V1 = {
     "threat_source": "Threat Source",
     "objective": "Objective",
     "capability": "Capability",
@@ -593,13 +592,47 @@ _COMPONENT_LABELS = {
     "target": "Target",
 }
 
+# v2 field names and labels
+THREAT_MODEL_COMPONENTS_V2 = [
+    "threat_source", "objective_or_harmful_outcome", "capability",
+    "knowledge", "access", "constraints_or_enabling_conditions",
+    "target_or_asset_at_risk",
+]
+_COMPONENT_LABELS_V2 = {
+    "threat_source": "Threat Source",
+    "objective_or_harmful_outcome": "Objective/Harmful Outcome",
+    "capability": "Capability",
+    "knowledge": "Knowledge",
+    "access": "Access",
+    "constraints_or_enabling_conditions": "Constraints/Enabling Conditions",
+    "target_or_asset_at_risk": "Target/Asset at Risk",
+}
+
+
+def _is_v2_threat_model(data: dict) -> bool:
+    """Detect v2 schema by checking for v2-specific field names."""
+    tm = data.get("threat_model", {})
+    return "objective_or_harmful_outcome" in tm
+
 
 def _generate_review_md_2c(data: dict, scenario_text: str) -> str:
-    """Generate a review markdown doc for a single 2c threat model output."""
+    """Generate a review markdown doc for a single 2c threat model output.
+
+    Handles both v1 and v2 schemas. v2 adds an Uncertainty column.
+    """
     paper_id = data.get("paper_id", "?")
     scenario_id = data.get("scenario_id", "?")
     threat_model = data.get("threat_model", {})
     evidence = data.get("evidence", {})
+    is_v2 = _is_v2_threat_model(data)
+
+    if is_v2:
+        components = THREAT_MODEL_COMPONENTS_V2
+        labels = _COMPONENT_LABELS_V2
+        uncertainty_flags = data.get("uncertainty_flags", {})
+    else:
+        components = THREAT_MODEL_COMPONENTS_V1
+        labels = _COMPONENT_LABELS_V1
 
     lines = []
     lines.append(f"# Threat Model Review: {paper_id} — {scenario_id}")
@@ -611,13 +644,24 @@ def _generate_review_md_2c(data: dict, scenario_text: str) -> str:
     lines.append("")
     lines.append("## Threat Model Components")
     lines.append("")
-    lines.append("| Component | Value | Evidence |")
-    lines.append("|-----------|-------|----------|")
-    for comp in THREAT_MODEL_COMPONENTS:
-        label = _COMPONENT_LABELS[comp]
-        value = threat_model.get(comp, "Not specified")
-        ev = evidence.get(comp, "Not specified")
-        lines.append(f"| {label} | {value} | {ev} |")
+
+    if is_v2:
+        lines.append("| Component | Value | Evidence | Uncertainty |")
+        lines.append("|-----------|-------|----------|-------------|")
+        for comp in components:
+            label = labels[comp]
+            value = threat_model.get(comp, "Not specified")
+            ev = evidence.get(comp, "Not specified")
+            uf = uncertainty_flags.get(comp, "Not specified")
+            lines.append(f"| {label} | {value} | {ev} | {uf} |")
+    else:
+        lines.append("| Component | Value | Evidence |")
+        lines.append("|-----------|-------|----------|")
+        for comp in components:
+            label = labels[comp]
+            value = threat_model.get(comp, "Not specified")
+            ev = evidence.get(comp, "Not specified")
+            lines.append(f"| {label} | {value} | {ev} |")
 
     lines.append("")
     lines.append("**Reviewer decision:** [ ] Accept  [ ] Reject  [ ] Needs discussion")
@@ -688,18 +732,29 @@ def generate_review_docs_2c(
 
         # Count specified vs not-specified components
         threat_model = data.get("threat_model", {})
+        is_v2 = _is_v2_threat_model(data)
+        components = THREAT_MODEL_COMPONENTS_V2 if is_v2 else THREAT_MODEL_COMPONENTS_V1
+
         num_specified = sum(
-            1 for comp in THREAT_MODEL_COMPONENTS
+            1 for comp in components
             if threat_model.get(comp, "Not specified") != "Not specified"
         )
-        num_not_specified = len(THREAT_MODEL_COMPONENTS) - num_specified
+        num_not_specified = len(components) - num_specified
 
-        summary_rows.append({
+        row = {
             "paper_id": paper_id,
             "scenario_id": scenario_id,
             "num_specified_components": num_specified,
             "num_not_specified": num_not_specified,
-        })
+        }
+
+        # v2 adds uncertainty flag counts
+        if is_v2:
+            uf = data.get("uncertainty_flags", {})
+            row["num_clear"] = sum(1 for comp in components if uf.get(comp, "") == "Clear")
+            row["num_ambiguous"] = sum(1 for comp in components if uf.get(comp, "") == "Ambiguous")
+
+        summary_rows.append(row)
 
         all_outputs.append(data)
         print(f"  [OK] {item_key} — review doc generated ({num_specified}/7 components specified)")
